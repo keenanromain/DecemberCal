@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    platform: linux/arm64
+    environment:
+      POSTGRES_USER: decembercal
+      POSTGRES_PASSWORD: decembercal
+      POSTGRES_DB: decembercal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decembercal"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+  write-service:
+    platform: linux/arm64
+    build:
+      context: ./services/write-service-ts
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://decembercal:decembercal@postgres:5432/decembercal?schema=public
+      PORT: 4000
+    depends_on:
+      - postgres
+    ports:
+      - 4000:4000
+
+  read-service:
+    platform: linux/arm64
+    build:
+      context: ./services/read-service-go
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://decembercal:decembercal@postgres:5432/decembercal?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4001:4001"
+
+
+  frontend:
+    platform: linux/arm64
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_READ_API: http://host.docker.internal:4001
+      VITE_WRITE_API: http://host.docker.internal:4000
+    ports:
+      - 5173:5173
+    depends_on:
+      - write-service
+      - read-service
+
+volumes:
+  postgres-data:
