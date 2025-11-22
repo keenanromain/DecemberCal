@@ -2,10 +2,13 @@ FROM node:20-slim
 
 WORKDIR /app
 
+# Copy config files FIRST
 COPY package.json package-lock.json* ./
-RUN npm install
+COPY postcss.config.cjs tailwind.config.js vite.config.js ./
+COPY src ./src
+COPY index.html ./
 
-COPY . .
+RUN npm install
 
 EXPOSE 5173
 

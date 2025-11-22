@@ -34,6 +34,8 @@ export default function EventForm({ onEventCreated }) {
       body: JSON.stringify(payload),
     });
 
+    window.dispatchEvent(new Event("eventsUpdated"));
+
     setForm({
       name: "",
       start: "",

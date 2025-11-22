@@ -1,6 +1,7 @@
 import React from "react";
 import EventForm from "./components/EventForm.jsx";
 import EventList from "./components/EventList.jsx";
+import Calendar from "./components/Calendar.jsx";
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       </h1>
 
       <div className="max-w-4xl mx-auto">
+        <Calendar />
         <EventForm />
         <EventList />
       </div>
