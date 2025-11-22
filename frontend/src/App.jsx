@@ -1,21 +1,22 @@
 import React from "react";
-import EventForm from "./components/EventForm.jsx";
-import EventList from "./components/EventList.jsx";
-import Calendar from "./components/Calendar.jsx";
+import { Box, Container, Heading, Stack } from "@chakra-ui/react";
+import EventForm from "./components/EventForm";
+import Calendar from "./components/Calendar";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 px-4 py-10">
-      <h1 className="text-4xl font-bold mb-10 text-center text-gray-800">
-        DecemberCal
-      </h1>
+    <Container maxW="6xl" py={10}>
+      <Stack spacing={12}>
+        <Box textAlign="center">
+          <Heading size="2xl">DecemberCal</Heading>
+        </Box>
 
-      <div className="max-w-4xl mx-auto">
         <Calendar />
+
         <EventForm />
-        <EventList />
-      </div>
-    </div>
+      </Stack>
+    </Container>
   );
 }
+
 

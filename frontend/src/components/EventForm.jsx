@@ -1,6 +1,19 @@
 import React, { useState } from "react";
+import { createEvent } from "../lib/api";
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  NumberInput,
+  NumberInputField,
+  VStack,
+  Heading,
+} from "@chakra-ui/react";
 
-export default function EventForm({ onEventCreated }) {
+export default function EventForm() {
   const [form, setForm] = useState({
     name: "",
     start: "",
@@ -24,16 +37,13 @@ export default function EventForm({ onEventCreated }) {
       location: form.location,
       start: new Date(form.start).toISOString(),
       end: new Date(form.end).toISOString(),
-      minAttendees: form.minAttendees ? Number(form.minAttendees) : null,
-      maxAttendees: form.maxAttendees ? Number(form.maxAttendees) : null,
+      minAttendees: form.minAttendees || null,
+      maxAttendees: form.maxAttendees || null,
     };
 
-    await fetch("http://localhost:4000/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    await createEvent(payload);
 
+    // Notify calendar to reload
     window.dispatchEvent(new Event("eventsUpdated"));
 
     setForm({
@@ -45,108 +55,82 @@ export default function EventForm({ onEventCreated }) {
       minAttendees: "",
       maxAttendees: "",
     });
-
-    if (onEventCreated) onEventCreated();
   };
 
   return (
-    <div className="bg-white shadow-md border rounded-xl p-8 mb-12">
-      <h2 className="text-2xl font-semibold mb-6">Create Event</h2>
+    <Box p={8} bg="white" rounded="xl" shadow="md">
+      <Heading size="lg" mb={6}>
+        Create Event
+      </Heading>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* NAME */}
-        <div>
-          <label className="block font-medium mb-1">Event Name</label>
-          <input
-            type="text"
-            name="name"
-            className="w-full border rounded-lg px-3 py-2"
-            value={form.name}
-            onChange={handleChange}
-          />
-        </div>
+      <form onSubmit={handleSubmit}>
+        <VStack spacing={5}>
+          <FormControl>
+            <FormLabel>Event Name</FormLabel>
+            <Input name="name" value={form.name} onChange={handleChange} />
+          </FormControl>
 
-        {/* START / END */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block font-medium mb-1">Start</label>
-            <input
+          <FormControl>
+            <FormLabel>Description</FormLabel>
+            <Textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+            />
+          </FormControl>
+
+          <FormControl>
+            <FormLabel>Location</FormLabel>
+            <Input name="location" value={form.location} onChange={handleChange} />
+          </FormControl>
+
+          <FormControl>
+            <FormLabel>Start</FormLabel>
+            <Input
               type="datetime-local"
               name="start"
-              className="w-full border rounded-lg px-3 py-2"
               value={form.start}
               onChange={handleChange}
             />
-          </div>
+          </FormControl>
 
-          <div>
-            <label className="block font-medium mb-1">End</label>
-            <input
+          <FormControl>
+            <FormLabel>End</FormLabel>
+            <Input
               type="datetime-local"
               name="end"
-              className="w-full border rounded-lg px-3 py-2"
               value={form.end}
               onChange={handleChange}
             />
-          </div>
-        </div>
+          </FormControl>
 
-        {/* LOCATION */}
-        <div>
-          <label className="block font-medium mb-1">Location</label>
-          <input
-            type="text"
-            name="location"
-            className="w-full border rounded-lg px-3 py-2"
-            value={form.location}
-            onChange={handleChange}
-          />
-        </div>
+          <FormControl>
+            <FormLabel>Minimum Attendees</FormLabel>
+            <NumberInput>
+              <NumberInputField
+                name="minAttendees"
+                value={form.minAttendees}
+                onChange={handleChange}
+              />
+            </NumberInput>
+          </FormControl>
 
-        {/* DESCRIPTION */}
-        <div>
-          <label className="block font-medium mb-1">Description</label>
-          <textarea
-            name="description"
-            className="w-full border rounded-lg px-3 py-2 h-24"
-            value={form.description}
-            onChange={handleChange}
-          />
-        </div>
+          <FormControl>
+            <FormLabel>Maximum Attendees</FormLabel>
+            <NumberInput>
+              <NumberInputField
+                name="maxAttendees"
+                value={form.maxAttendees}
+                onChange={handleChange}
+              />
+            </NumberInput>
+          </FormControl>
 
-        {/* MIN / MAX ATTENDEES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block font-medium mb-1">Minimum Attendees</label>
-            <input
-              type="number"
-              name="minAttendees"
-              className="w-full border rounded-lg px-3 py-2"
-              value={form.minAttendees}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div>
-            <label className="block font-medium mb-1">Maximum Attendees</label>
-            <input
-              type="number"
-              name="maxAttendees"
-              className="w-full border rounded-lg px-3 py-2"
-              value={form.maxAttendees}
-              onChange={handleChange}
-            />
-          </div>
-        </div>
-
-        {/* SUBMIT */}
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition"
-        >
-          Create Event
-        </button>
+          <Button colorScheme="blue" type="submit" width="full" size="lg">
+            Create Event
+          </Button>
+        </VStack>
       </form>
-    </div>
+    </Box>
   );
 }
