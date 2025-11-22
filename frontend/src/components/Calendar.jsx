@@ -1,15 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { getEvents } from "../lib/api";
-import {
-  Box,
-  Grid,
-  Text,
-  Heading,
-  VStack,
-  Badge,
-  useTheme,
-} from "@chakra-ui/react";
+import React, { useState, useEffect } from "react";
+import { Box, Text, Grid, GridItem, Heading } from "@chakra-ui/react";
 
+// Utility: Get all days in a specific month
 function getDaysInMonth(year, month) {
   const date = new Date(year, month, 1);
   const days = [];
@@ -26,66 +18,110 @@ export default function Calendar() {
   const [events, setEvents] = useState([]);
 
   async function loadEvents() {
-    const data = await getEvents();
-    setEvents(data || []);
+    try {
+      const res = await fetch("http://localhost:4001/events");
+      const data = await res.json();
+      setEvents(data);
+    } catch (err) {
+      console.error("Failed to load events:", err);
+    }
   }
 
+  // Initial load
   useEffect(() => {
     loadEvents();
-    window.addEventListener("eventsUpdated", loadEvents);
-    return () => window.removeEventListener("eventsUpdated", loadEvents);
   }, []);
 
+  // Listen for updates from the EventForm
+  useEffect(() => {
+    function handleUpdate() {
+      loadEvents();
+    }
+
+    window.addEventListener("eventsUpdated", handleUpdate);
+    return () => window.removeEventListener("eventsUpdated", handleUpdate);
+  }, []);
+
+  // Hardcode December 2025
   const year = 2025;
-  const month = 11;
+  const month = 11; // December (zero-indexed)
   const monthDays = getDaysInMonth(year, month);
 
-  const eventsByDay = {};
-  for (const e of events) {
-    const key = new Date(e.start).toISOString().split("T")[0];
-    if (!eventsByDay[key]) eventsByDay[key] = [];
-    eventsByDay[key].push(e);
+  // Group events by date
+  const eventsByDate = {};
+  for (const ev of events) {
+    const date = new Date(ev.start).toISOString().split("T")[0]; // YYYY-MM-DD
+    if (!eventsByDate[date]) eventsByDate[date] = [];
+    eventsByDate[date].push(ev);
   }
 
   return (
-    <Box p={8} bg="white" rounded="xl" shadow="md">
-      <Heading size="lg" mb={6} textAlign="center">
+    <Box width="100%" maxW="1200px" mx="auto" mt={12} px={4}>
+      <Heading textAlign="center" fontSize="3xl" mb={4}>
         December 2025
       </Heading>
 
-      <Grid templateColumns="repeat(7, 1fr)" gap={4} mb={3}>
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <Text key={d} fontWeight="bold" textAlign="center">
-            {d}
+      {/* Weekday labels */}
+      <Grid templateColumns="repeat(7, 1fr)" textAlign="center" mb={4}>
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dow) => (
+          <Text key={dow} fontWeight="bold" fontSize="lg">
+            {dow}
           </Text>
         ))}
       </Grid>
 
+      {/* Calendar grid */}
       <Grid templateColumns="repeat(7, 1fr)" gap={4}>
         {monthDays.map((day) => {
-          const key = day.toISOString().split("T")[0];
-          const todaysEvents = eventsByDay[key] || [];
+          const dateKey = day.toISOString().split("T")[0];
+          const todaysEvents = eventsByDate[dateKey] || [];
 
           return (
-            <Box key={key} border="1px solid #e2e8f0" rounded="md" p={3} minH="120px">
-              <Text fontWeight="bold" mb={2}>
-                {day.getDate()}
-              </Text>
+            <GridItem key={dateKey}>
+              <Box
+                borderWidth="1px"
+                rounded="lg"
+                p={3}
+                h="150px"
+                overflowY="auto"
+                bg="gray.50"
+                _hover={{ bg: "gray.100" }}
+                transition="0.2s"
+              >
+                {/* Day number */}
+                <Text fontWeight="bold" fontSize="lg">
+                  {day.getDate()}
+                </Text>
 
-              <VStack align="stretch" spacing={1}>
-                {todaysEvents.map((ev) => (
-                  <Badge key={ev.id} colorScheme="blue" px={2} py={1} rounded="md">
-                    {ev.name}
-                  </Badge>
-                ))}
-
-                {todaysEvents.length === 0 && (
-                  <Text color="gray.400" fontSize="sm">
+                {/* Events */}
+                {todaysEvents.length === 0 ? (
+                  <Text
+                    fontSize="sm"
+                    color="gray.400"
+                    mt={2}
+                    fontStyle="italic"
+                  >
                     No events
                   </Text>
+                ) : (
+                  todaysEvents.map((ev) => (
+                    <Box
+                      key={ev.id}
+                      bg="blue.50"
+                      color="blue.700"
+                      p={1}
+                      rounded="md"
+                      fontSize="xs"
+                      mt={2}
+                      borderWidth="1px"
+                      borderColor="blue.200"
+                    >
+                      {ev.name}
+                    </Box>
+                  ))
                 )}
-              </VStack>
-            </Box>
+              </Box>
+            </GridItem>
           );
         })}
       </Grid>
