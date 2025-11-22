@@ -6,13 +6,20 @@ import { eventSchema } from './validation';
 
 const prisma = new PrismaClient();
 const app = express();
+const allowed = ['POST', 'PUT', 'DELETE', 'OPTIONS'];
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use((req, res, next) => {
+  if (!allowed.includes(req.method)) {
+    return res.status(405).json({
+      error: `${req.method} not allowed — write service only supports POST, PUT, DELETE`
+    });
+  }
+  next();
+});
 
-// -----------------------------------------
 // CREATE EVENT (POST)
-// -----------------------------------------
 app.post('/events', async (req, res) => {
   try {
     const data = eventSchema.parse(req.body);
@@ -32,8 +39,6 @@ app.post('/events', async (req, res) => {
       },
     });
 
-    console.log("[write-service] refreshing materialized view events_read...");
-    // ALWAYS use non-concurrent refresh — your MV does not support concurrent refresh
     await prisma.$executeRawUnsafe(`
       REFRESH MATERIALIZED VIEW events_read;
     `);
@@ -48,9 +53,7 @@ app.post('/events', async (req, res) => {
   }
 });
 
-// -----------------------------------------
 // UPDATE EVENT (PUT)
-// -----------------------------------------
 app.put('/events/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -72,7 +75,6 @@ app.put('/events/:id', async (req, res) => {
       },
     });
 
-    console.log("[write-service] refreshing materialized view events_read...");
     await prisma.$executeRawUnsafe(`
       REFRESH MATERIALIZED VIEW events_read;
     `);
@@ -87,9 +89,7 @@ app.put('/events/:id', async (req, res) => {
   }
 });
 
-// -----------------------------------------
 // DELETE EVENT (DELETE)
-// -----------------------------------------
 app.delete('/events/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -98,7 +98,6 @@ app.delete('/events/:id', async (req, res) => {
       where: { id },
     });
 
-    console.log("[write-service] refreshing materialized view events_read...");
     await prisma.$executeRawUnsafe(`
       REFRESH MATERIALIZED VIEW events_read;
     `);
@@ -113,9 +112,7 @@ app.delete('/events/:id', async (req, res) => {
   }
 });
 
-// -----------------------------------------
 // START SERVER
-// -----------------------------------------
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`[write-service-ts] listening on port ${port}`);
