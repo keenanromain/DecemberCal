@@ -70,9 +70,6 @@ export default function EventForm() {
         minAttendees: "",
         maxAttendees: "",
       });
-
-      // 🔥 Tell the calendar to refresh
-      window.dispatchEvent(new Event("eventsUpdated"));
     } catch (err) {
       toast({
         title: "Error",
