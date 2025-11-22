@@ -10,6 +10,20 @@ const allowed = ['POST', 'PUT', 'DELETE', 'OPTIONS'];
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// Register /healthz as health check
+app.get('/healthz', async (req, res) => {
+  try {
+    await prisma.$queryRawUnsafe('SELECT 1;')
+    console.log("[write-service] health status endpoint reached.");
+    return res.status(200).json({ status: 'ok', service: 'write-service' })
+  } catch (err) {
+    console.error('[write-service] healthz failed:', err)
+    return res.status(503).json({ status: 'error', service: 'write-service' })
+  }
+})
+
+// Filter out all other GET requests
 app.use((req, res, next) => {
   if (!allowed.includes(req.method)) {
     return res.status(405).json({
@@ -19,7 +33,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// CREATE EVENT (POST)
+// Create event (POST)
 app.post('/events', async (req, res) => {
   try {
     const data = eventSchema.parse(req.body);
@@ -53,7 +67,7 @@ app.post('/events', async (req, res) => {
   }
 });
 
-// UPDATE EVENT (PUT)
+// Update event (PUT)
 app.put('/events/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -89,7 +103,7 @@ app.put('/events/:id', async (req, res) => {
   }
 });
 
-// DELETE EVENT (DELETE)
+// Delete event (DELETE)
 app.delete('/events/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -112,7 +126,7 @@ app.delete('/events/:id', async (req, res) => {
   }
 });
 
-// START SERVER
+// Start server
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`[write-service-ts] listening on port ${port}`);
