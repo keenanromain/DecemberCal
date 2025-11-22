@@ -10,6 +10,10 @@ import (
 
 var Pool *pgxpool.Pool
 
+func Ping(ctx context.Context) error {
+	return Pool.Ping(ctx)
+}
+
 func Connect(ctx context.Context) error {
 	url := os.Getenv("DATABASE_URL")
 	cfg, err := pgxpool.ParseConfig(url)
