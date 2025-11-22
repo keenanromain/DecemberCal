@@ -7,9 +7,10 @@ import (
 	"os"
 	"time"
 
+	"readservice/internal/db"
+	"readservice/internal/handlers"
+
 	"github.com/gorilla/mux"
-	"github.com/keenanromain/decembercal/readservice/internal/db"
-	"github.com/keenanromain/decembercal/readservice/internal/handlers"
 )
 
 func main() {

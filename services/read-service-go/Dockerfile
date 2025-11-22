@@ -1,10 +1,29 @@
-FROM golang:1.21-alpine AS builder
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
+FROM golang:1.23 AS builder
+
+WORKDIR /app
+
 COPY . .
-RUN CGO_ENABLED=0 go build -o /readsvc ./cmd/readsvc
-FROM alpine:3.18
-COPY --from=builder /readsvc /readsvc
+
+RUN go mod download
+
+# Build ARM64 binary for M1/M2 Mac Docker
+RUN GOARCH=arm64 GOOS=linux go build -o readsvc ./cmd/readsvc
+
+
+# --------------------------
+# Runtime (Debian slim)
+# --------------------------
+FROM debian:stable-slim
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean
+
+COPY --from=builder /app/readsvc ./readsvc
+
 EXPOSE 4001
-ENTRYPOINT ["/readsvc"]
+
+CMD ["./readsvc"]
+
