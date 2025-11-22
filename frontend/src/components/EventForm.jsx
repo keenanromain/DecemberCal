@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { createEvent } from "../lib/api";
 import {
   Box,
   Button,
@@ -7,13 +6,16 @@ import {
   FormLabel,
   Input,
   Textarea,
+  SimpleGrid,
   NumberInput,
   NumberInputField,
+  useToast,
   VStack,
-  Heading,
 } from "@chakra-ui/react";
 
 export default function EventForm() {
+  const toast = useToast();
+
   const [form, setForm] = useState({
     name: "",
     start: "",
@@ -37,96 +39,158 @@ export default function EventForm() {
       location: form.location,
       start: new Date(form.start).toISOString(),
       end: new Date(form.end).toISOString(),
-      minAttendees: form.minAttendees || null,
-      maxAttendees: form.maxAttendees || null,
+      minAttendees: form.minAttendees ? Number(form.minAttendees) : null,
+      maxAttendees: form.maxAttendees ? Number(form.maxAttendees) : null,
     };
 
-    await createEvent(payload);
+    try {
+      const res = await fetch("http://localhost:4000/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    // Notify calendar to reload
-    window.dispatchEvent(new Event("eventsUpdated"));
+      if (!res.ok) throw new Error("Failed to create event");
 
-    setForm({
-      name: "",
-      start: "",
-      end: "",
-      location: "",
-      description: "",
-      minAttendees: "",
-      maxAttendees: "",
-    });
+      toast({
+        title: "Event created!",
+        description: "Your event has been added to the calendar.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Reset form
+      setForm({
+        name: "",
+        start: "",
+        end: "",
+        location: "",
+        description: "",
+        minAttendees: "",
+        maxAttendees: "",
+      });
+
+      // 🔥 Tell the calendar to refresh
+      window.dispatchEvent(new Event("eventsUpdated"));
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to create event. Check the backend.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
   return (
-    <Box p={8} bg="white" rounded="xl" shadow="md">
-      <Heading size="lg" mb={6}>
-        Create Event
-      </Heading>
-
+    <Box
+      bg="white"
+      p={8}
+      mt={12}
+      rounded="xl"
+      shadow="md"
+      borderWidth="1px"
+      maxW="900px"
+      mx="auto"
+    >
       <form onSubmit={handleSubmit}>
-        <VStack spacing={5}>
+        <VStack spacing={6} align="stretch">
+
+          {/* Name */}
           <FormControl>
             <FormLabel>Event Name</FormLabel>
-            <Input name="name" value={form.name} onChange={handleChange} />
+            <Input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Christmas Party"
+            />
           </FormControl>
 
+          {/* Start / End */}
+          <SimpleGrid columns={[1, 2]} spacing={6}>
+            <FormControl>
+              <FormLabel>Start</FormLabel>
+              <Input
+                type="datetime-local"
+                name="start"
+                value={form.start}
+                onChange={handleChange}
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>End</FormLabel>
+              <Input
+                type="datetime-local"
+                name="end"
+                value={form.end}
+                onChange={handleChange}
+              />
+            </FormControl>
+          </SimpleGrid>
+
+          {/* Location */}
+          <FormControl>
+            <FormLabel>Location</FormLabel>
+            <Input
+              name="location"
+              value={form.location}
+              onChange={handleChange}
+              placeholder="New York City"
+            />
+          </FormControl>
+
+          {/* Description */}
           <FormControl>
             <FormLabel>Description</FormLabel>
             <Textarea
               name="description"
               value={form.description}
               onChange={handleChange}
+              placeholder="Event details..."
+              resize="vertical"
             />
           </FormControl>
 
-          <FormControl>
-            <FormLabel>Location</FormLabel>
-            <Input name="location" value={form.location} onChange={handleChange} />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Start</FormLabel>
-            <Input
-              type="datetime-local"
-              name="start"
-              value={form.start}
-              onChange={handleChange}
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>End</FormLabel>
-            <Input
-              type="datetime-local"
-              name="end"
-              value={form.end}
-              onChange={handleChange}
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Minimum Attendees</FormLabel>
-            <NumberInput>
-              <NumberInputField
-                name="minAttendees"
+          {/* Min / Max attendees */}
+          <SimpleGrid columns={[1, 2]} spacing={6}>
+            <FormControl>
+              <FormLabel>Minimum Attendees</FormLabel>
+              <NumberInput
+                min={0}
                 value={form.minAttendees}
-                onChange={handleChange}
-              />
-            </NumberInput>
-          </FormControl>
+                onChange={(v) =>
+                  setForm({ ...form, minAttendees: v })
+                }
+              >
+                <NumberInputField name="minAttendees" />
+              </NumberInput>
+            </FormControl>
 
-          <FormControl>
-            <FormLabel>Maximum Attendees</FormLabel>
-            <NumberInput>
-              <NumberInputField
-                name="maxAttendees"
+            <FormControl>
+              <FormLabel>Maximum Attendees</FormLabel>
+              <NumberInput
+                min={0}
                 value={form.maxAttendees}
-                onChange={handleChange}
-              />
-            </NumberInput>
-          </FormControl>
+                onChange={(v) =>
+                  setForm({ ...form, maxAttendees: v })
+                }
+              >
+                <NumberInputField name="maxAttendees" />
+              </NumberInput>
+            </FormControl>
+          </SimpleGrid>
 
-          <Button colorScheme="blue" type="submit" width="full" size="lg">
+          {/* Submit */}
+          <Button
+            type="submit"
+            colorScheme="blue"
+            size="lg"
+            alignSelf="flex-start"
+          >
             Create Event
           </Button>
         </VStack>
