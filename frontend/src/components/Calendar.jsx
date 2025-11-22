@@ -27,20 +27,22 @@ export default function Calendar() {
     }
   }
 
-  // Initial load
-  useEffect(() => {
-    loadEvents();
-  }, []);
+// Live SSE updates
+useEffect(() => {
+  loadEvents(); // initial fetch
 
-  // Listen for updates from the EventForm
-  useEffect(() => {
-    function handleUpdate() {
-      loadEvents();
-    }
+  const source = new EventSource("http://localhost:4001/events/stream");
 
-    window.addEventListener("eventsUpdated", handleUpdate);
-    return () => window.removeEventListener("eventsUpdated", handleUpdate);
-  }, []);
+  source.onmessage = () => {
+    loadEvents(); // whenever backend pushes refresh
+  };
+
+  source.onerror = (err) => {
+    console.error("SSE error:", err);
+  };
+
+  return () => source.close();
+}, []);
 
   // Hardcode December 2025
   const year = 2025;
