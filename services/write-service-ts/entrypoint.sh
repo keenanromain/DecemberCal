@@ -7,8 +7,8 @@ until nc -z postgres 5432; do
   sleep 1
 done
 
-echo "🚀 Postgres is ready. Skipping migrations for now..."
-# npx prisma migrate deploy
+echo "🚀 Postgres is ready. Running migrations..."
+npx prisma migrate deploy
 
-echo "✅ Starting write service…"
-npm run dev
+echo "✅ Migrations applied. Starting write service…"
+node dist/index.js

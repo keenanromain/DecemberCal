@@ -6,7 +6,6 @@ import { eventSchema } from './validation';
 
 const prisma = new PrismaClient();
 const app = express();
-const allowed = ['POST', 'PUT', 'DELETE', 'OPTIONS'];
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -21,16 +20,6 @@ app.get('/healthz', async (req, res) => {
     console.error('[write-service] healthz failed:', err)
     return res.status(503).json({ status: 'error', service: 'write-service' })
   }
-})
-
-// Filter out all other GET requests
-app.use((req, res, next) => {
-  if (!allowed.includes(req.method)) {
-    return res.status(405).json({
-      error: `${req.method} not allowed — write service only supports POST, PUT, DELETE`
-    });
-  }
-  next();
 });
 
 // Create event (POST)
@@ -109,6 +98,17 @@ app.delete('/events/:id', async (req, res) => {
       error: err?.errors ?? err?.message ?? 'delete failed',
     });
   }
+});
+
+// Middleware restricting GET
+const allowed = ['POST', 'PUT', 'DELETE', 'OPTIONS'];
+app.use((req, res, next) => {
+  if (!allowed.includes(req.method) && req.path !== "/healthz") {
+    return res.status(405).json({
+      error: `${req.method} not allowed — write service only supports POST, PUT, DELETE`
+    });
+  }
+  next();
 });
 
 // Start server
