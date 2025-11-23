@@ -1,19 +1,32 @@
-Overview
+#DecemberCal 📅
 
-This project is a microservice-oriented application composed of four independently containerized services, all orchestrated through a single docker-compose.yml file. The architecture cleanly separates concerns between data storage, data access, data mutation, and user interaction, making it easy to reason about, extend, and deploy.
+This project is an event-driven calendar application that lets users create, update, view, and delete events that they schedule through a simple interface.
 
-At a high level, the system includes:
+The project was developed using a microservice architecture composed of four independently containerized services:
 
-Postgres – the central relational database for persistent storage
+1. **Postgres** – the central relational database for persistent storage
+2. **Read-Service (Go**)** – the backend service responsible for data reads
+3. **Write-Service (TypeScript)** – the backend service responsible for data writes, updates, and deletes
+4. **Frontend** – a lightweight UI that interacts with the read/write services
 
-write-service – the backend service responsible for handling all data creation, updates, and business logic related to writes
+Each service is orchestrated through a single `docker-compose.yml` file found in the root of the respository.
 
-read-service – the backend service that exposes optimized, read-only endpoints for fetching application data
+At a high level, the system also includes:
 
-frontend – a lightweight UI that interacts with the read/write services over HTTP
+Postgres 
+ - Read Replication
+
+write-service 
+ - Database Migrations
+
+read-service 
+ - Server Send Events (SSE)
+
+frontend 
+ - NGINX Configuration
+
 
 To start the environment from scratch, use the helper script:
-
 ```
 ./docker_refresh.sh
 ```
@@ -23,7 +36,7 @@ http://localhost:8080/
 ```
 
 ## Table of Contents
-1. <a href="#postgres">PostgreSQL</a>
+1. <a href="#postgres">PostgresL</a>
 
 2. <a href="#read-service-go">Read-Service (Go)</a>
 
