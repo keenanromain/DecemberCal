@@ -53,11 +53,6 @@ app.post('/events', async (req, res) => {
       },
     });
 
-    await prisma.$executeRawUnsafe(`
-      REFRESH MATERIALIZED VIEW events_read;
-    `);
-    console.log("[write-service] materialized view refresh complete.");
-
     return res.status(201).json(created);
   } catch (err: any) {
     console.error(err);
@@ -89,11 +84,6 @@ app.put('/events/:id', async (req, res) => {
       },
     });
 
-    await prisma.$executeRawUnsafe(`
-      REFRESH MATERIALIZED VIEW events_read;
-    `);
-    console.log("[write-service] materialized view refresh complete.");
-
     return res.json(updated);
   } catch (err: any) {
     console.error(err);
@@ -111,11 +101,6 @@ app.delete('/events/:id', async (req, res) => {
     await prisma.event.delete({
       where: { id },
     });
-
-    await prisma.$executeRawUnsafe(`
-      REFRESH MATERIALIZED VIEW events_read;
-    `);
-    console.log("[write-service] materialized view refresh complete.");
 
     return res.status(204).send();
   } catch (err: any) {

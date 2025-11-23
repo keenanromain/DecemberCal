@@ -32,8 +32,6 @@ app.post('/events', async (req, res) => {
                 preparation_notes: data.preparation_notes ?? null
             }
         });
-        // Refresh materialized view
-        await prisma.$executeRawUnsafe('REFRESH MATERIALIZED VIEW CONCURRENTLY events_read;');
         res.status(201).json(created);
     }
     catch (err) {
@@ -65,7 +63,6 @@ app.put('/events/:id', async (req, res) => {
                 preparation_notes: data.preparation_notes ?? null
             }
         });
-        await prisma.$executeRawUnsafe('REFRESH MATERIALIZED VIEW CONCURRENTLY events_read;');
         res.json(updated);
     }
     catch (err) {
@@ -82,7 +79,6 @@ app.delete('/events/:id', async (req, res) => {
     try {
         const id = req.params.id;
         await prisma.event.delete({ where: { id } });
-        await prisma.$executeRawUnsafe('REFRESH MATERIALIZED VIEW CONCURRENTLY events_read;');
         res.status(204).send();
     }
     catch (err) {
