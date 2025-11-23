@@ -23,7 +23,7 @@ import {
 import eventsApi from "../api/events";
 const { createEvent, updateEvent, deleteEvent } = eventsApi;
 
-function prettyDate(iso) {
+function niceDate(iso) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
@@ -33,17 +33,10 @@ function prettyDate(iso) {
   });
 }
 
-export default function EventModal({
-  dateISO,
-  event,
-  isOpen,
-  onClose,
-  onChange,
-}) {
+export default function EventModal({ dateISO, event, isOpen, onClose, onChange }) {
   const toast = useToast();
   const isEdit = !!event;
 
-  // Local state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -56,7 +49,6 @@ export default function EventModal({
   const [prepNotes, setPrepNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // -------- Initialize when opened --------
   useEffect(() => {
     if (!isOpen) return;
 
@@ -81,8 +73,13 @@ export default function EventModal({
       setDescription(description || "");
       setLocation(location || "");
       setOnlineLink(online_link || "");
-      setStartTime(startDate.toISOString().substring(11, 16));
-      setEndTime(endDate.toISOString().substring(11, 16));
+      setStartTime(
+        `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`
+      );
+
+      setEndTime(
+        `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`
+      );
       setMinAttendees(min_attendees || "");
       setMaxAttendees(max_attendees || "");
       setLocationNotes(location_notes || "");
@@ -99,17 +96,53 @@ export default function EventModal({
       setLocationNotes("");
       setPrepNotes("");
     }
-  }, [isOpen, isEdit, dateISO, event]);
+  }, [isOpen, isEdit, event]);
 
-  // -------- Submit (POST or PUT) --------
   const handleSubmit = async () => {
+    // ----------- FRONTEND VALIDATION -----------
+    if (!name.trim()) {
+      return toast({
+        title: "Missing name",
+        status: "warning",
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+    if (!description.trim()) {
+      return toast({
+        title: "Missing description",
+        status: "warning",
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+    if (!location.trim() && !onlineLink.trim()) {
+      return toast({
+        title: "A location or online link is required",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+
+    const baseDate = isEdit ? event.start.split("T")[0] : dateISO;
+    const start = new Date(`${baseDate}T${startTime}:00`);
+    const end = new Date(`${baseDate}T${endTime}:00`);
+
+    if (end <= start) {
+      return toast({
+        title: "Invalid time range",
+        description: "End time must be after start time.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+
+    // -------------------------------------------
+
     try {
       setSubmitting(true);
-
-      const baseDate = isEdit ? event.start.split("T")[0] : dateISO;
-
-      const start = new Date(`${baseDate}T${startTime}:00`);
-      const end = new Date(`${baseDate}T${endTime}:00`);
 
       const payload = {
         name,
@@ -146,7 +179,6 @@ export default function EventModal({
     }
   };
 
-  // -------- Delete --------
   const handleDelete = async () => {
     if (!isEdit) return;
 
@@ -162,8 +194,8 @@ export default function EventModal({
   };
 
   const headerText = isEdit
-    ? `Edit Event – ${prettyDate(event.start.split("T")[0])}`
-    : `Create Event – ${prettyDate(dateISO)}`;
+    ? `Edit Event – ${niceDate(event.start.split("T")[0])}`
+    : `Create Event – ${niceDate(dateISO)}`;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
@@ -178,28 +210,19 @@ export default function EventModal({
               <Input value={name} onChange={(e) => setName(e.target.value)} />
             </FormControl>
 
-            <FormControl>
+            <FormControl isRequired>
               <FormLabel>Description</FormLabel>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
             </FormControl>
 
             <FormControl>
               <FormLabel>Location</FormLabel>
-              <Input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
+              <Input value={location} onChange={(e) => setLocation(e.target.value)} />
             </FormControl>
 
             <FormControl>
               <FormLabel>Online Link <small>(optional)</small></FormLabel>
-              <Input
-                value={onlineLink}
-                onChange={(e) => setOnlineLink(e.target.value)}
-              />
+              <Input value={onlineLink} onChange={(e) => setOnlineLink(e.target.value)} />
             </FormControl>
 
             <SimpleGrid columns={[1, 2]} spacing={4}>
@@ -225,22 +248,14 @@ export default function EventModal({
             <SimpleGrid columns={[1, 2]} spacing={4}>
               <FormControl>
                 <FormLabel>Min Attendees <small>(optional)</small></FormLabel>
-                <NumberInput
-                  min={0}
-                  value={minAttendees}
-                  onChange={(v) => setMinAttendees(v)}
-                >
+                <NumberInput min={0} value={minAttendees} onChange={(v) => setMinAttendees(v)}>
                   <NumberInputField />
                 </NumberInput>
               </FormControl>
 
               <FormControl>
                 <FormLabel>Max Attendees <small>(optional)</small></FormLabel>
-                <NumberInput
-                  min={0}
-                  value={maxAttendees}
-                  onChange={(v) => setMaxAttendees(v)}
-                >
+                <NumberInput min={0} value={maxAttendees} onChange={(v) => setMaxAttendees(v)}>
                   <NumberInputField />
                 </NumberInput>
               </FormControl>
@@ -256,22 +271,14 @@ export default function EventModal({
 
             <FormControl>
               <FormLabel>Preparation Notes <small>(optional)</small></FormLabel>
-              <Textarea
-                value={prepNotes}
-                onChange={(e) => setPrepNotes(e.target.value)}
-              />
+              <Textarea value={prepNotes} onChange={(e) => setPrepNotes(e.target.value)} />
             </FormControl>
           </VStack>
         </ModalBody>
 
         <ModalFooter>
           {isEdit && (
-            <Button
-              colorScheme="red"
-              mr="auto"
-              onClick={handleDelete}
-              isDisabled={submitting}
-            >
+            <Button colorScheme="red" mr="auto" onClick={handleDelete} isDisabled={submitting}>
               Delete
             </Button>
           )}
@@ -280,11 +287,7 @@ export default function EventModal({
             Cancel
           </Button>
 
-          <Button
-            colorScheme="blue"
-            onClick={handleSubmit}
-            isLoading={submitting}
-          >
+          <Button colorScheme="blue" onClick={handleSubmit} isLoading={submitting}>
             {isEdit ? "Save Changes" : "Create Event"}
           </Button>
         </ModalFooter>
@@ -292,3 +295,4 @@ export default function EventModal({
     </Modal>
   );
 }
+
