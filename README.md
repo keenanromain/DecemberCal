@@ -1,11 +1,11 @@
-#DecemberCal 📅
+# DecemberCal 📅
 
-This project is an event-driven calendar application that lets users create, update, view, and delete events that they schedule through a simple interface.
+This project is an event-driven calendar application that lets users create, view, update, and delete events that they schedule through a simple web interface.
 
 The project was developed using a microservice architecture composed of four independently containerized services:
 
 1. **Postgres** – the central relational database for persistent storage
-2. **Read-Service (Go**)** – the backend service responsible for data reads
+2. **Read-Service (Go)** – the backend service responsible for data reads
 3. **Write-Service (TypeScript)** – the backend service responsible for data writes, updates, and deletes
 4. **Frontend** – a lightweight UI that interacts with the read/write services
 
@@ -25,6 +25,10 @@ read-service
 frontend 
  - NGINX Configuration
 
+Data Flow looks like the following:
+``
+frontend → write-service → events table → events_read table → read-service → SSE → frontend
+``
 
 To start the environment from scratch, use the helper script:
 ```
