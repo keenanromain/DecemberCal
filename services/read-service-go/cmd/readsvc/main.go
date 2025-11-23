@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -20,7 +21,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 
-		if r.Method == "OPTIONS" {
+		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -31,17 +32,22 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 // HealthCheckHandler verifies DB connectivity and reports service health.
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
+	status := map[string]string{"service": "read-service"}
+
 	if err := db.Ping(ctx); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"status":"error","service":"read-service"}`))
-		return
+		status["status"] = "error"
+	} else {
+		w.WriteHeader(http.StatusOK)
+		status["status"] = "ok"
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok","service":"read-service"}`))
+	json.NewEncoder(w).Encode(status)
 }
 
 // methodNotAllowed enforces CQRS (read service only supports GET).
@@ -66,29 +72,19 @@ func main() {
 	// Apply CORS
 	r.Use(corsMiddleware)
 
-	// ------------------------------------------------------------------
-	// 🚨 ORDER MATTERS — SSE ROUTE MUST COME BEFORE "/events/{id}"
-	// ------------------------------------------------------------------
+	// 🚨 ORDER MATTERS — specific routes BEFORE "/events/{id}"
 
-	// Server-Sent Events Stream
-	r.HandleFunc("/events/stream", handlers.SSEHandler).Methods("GET")
+	// SSE stream for frontend
+	r.HandleFunc("/events/stream", handlers.SSEHandler).Methods(http.MethodGet)
 
-	// List events
-	r.HandleFunc("/events", handlers.ListEvents).Methods("GET")
+	// List events (reads from materialized view)
+	r.HandleFunc("/events", handlers.ListEvents).Methods(http.MethodGet)
 
 	// Get single event by ID
-	r.HandleFunc("/events/{id}", handlers.GetEvent).Methods("GET")
+	r.HandleFunc("/events/{id}", handlers.GetEvent).Methods(http.MethodGet)
 
-	// Health Check
-	r.HandleFunc("/healthz", HealthCheckHandler).Methods("GET")
-
-	// Optional startup broadcast (helps verify SSE works)
-	go func() {
-		time.Sleep(2 * time.Second)
-		handlers.Hub.Broadcast <- []byte(`{"type":"startup","msg":"SSE online"}`)
-	}()
-
-	// ------------------------------------------------------------------
+	// Health check
+	r.HandleFunc("/healthz", HealthCheckHandler).Methods(http.MethodGet)
 
 	host := "0.0.0.0"
 	port := os.Getenv("PORT")
@@ -98,12 +94,10 @@ func main() {
 	addr := host + ":" + port
 
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      r,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		Addr:    addr,
+		Handler: r,
 	}
 
-	log.Printf("Read-service listening on %s (GET ONLY)", addr)
+	log.Printf("Read-service listening on %s (GET ONLY, SSE enabled)", addr)
 	log.Fatal(server.ListenAndServe())
 }
