@@ -5,7 +5,6 @@ COMPOSE="docker compose"
 MAX_RETRIES=20
 SLEEP_TIME=1
 
-echo ""
 echo "🚿 Cleaning up old Docker containers, networks, dangling images…"
 $COMPOSE down -v --remove-orphans >/dev/null 2>&1 || true
 docker system prune -f >/dev/null 2>&1 || true

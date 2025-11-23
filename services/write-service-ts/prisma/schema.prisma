@@ -9,20 +9,23 @@ datasource db {
 }
 
 model Event {
-  id                String    @id @default(uuid())
+  id                String   @id @default(uuid())
   name              String
   description       String
-  start             DateTime  @db.Timestamp(3)
-  end               DateTime  @db.Timestamp(3)
+  start             DateTime
+  end               DateTime
   location          String?
   online_link       String?
   min_attendees     Int?
   max_attendees     Int?
   location_notes    String?
   preparation_notes String?
-  created_at        DateTime  @default(now()) @db.Timestamp(3)
-  updated_at        DateTime  @default(now()) @db.Timestamp(3)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now())
+
+  @@map("events")
 }
+
 
 model EventsRead {
   id                String    @id

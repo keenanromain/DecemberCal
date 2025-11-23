@@ -35,13 +35,20 @@ export default function EventForm() {
 
     const payload = {
       name: form.name,
-      description: form.description,
-      location: form.location,
+      description: form.description || "",
+      location: form.location || undefined,
       start: new Date(form.start).toISOString(),
       end: new Date(form.end).toISOString(),
-      minAttendees: form.minAttendees ? Number(form.minAttendees) : null,
-      maxAttendees: form.maxAttendees ? Number(form.maxAttendees) : null,
+      min_attendees: form.minAttendees ? Number(form.minAttendees) : undefined,
+      max_attendees: form.maxAttendees ? Number(form.maxAttendees) : undefined,
+      // Only include optional fields if they have meaningful values
+      ...(form.online_link ? { online_link: form.online_link } : {}),
+      ...(form.location_notes ? { location_notes: form.location_notes } : {}),
+      ...(form.preparation_notes ? { preparation_notes: form.preparation_notes } : {}),
     };
+
+
+
 
     try {
       const res = await fetch("http://localhost:4000/events", {

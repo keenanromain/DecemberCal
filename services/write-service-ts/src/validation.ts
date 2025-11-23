@@ -5,7 +5,7 @@ export const eventSchema = z.object({
   description: z.string().optional().or(z.literal('')),
   start: z.string().refine(v => !isNaN(Date.parse(v)), { message: 'Invalid start date' }),
   end: z.string().refine(v => !isNaN(Date.parse(v)), { message: 'Invalid end date' }),
-  location: z.string().optional(),
+  location: z.string().min(1).optional(),
   online_link: z.string().optional(),
   min_attendees: z.number().int().positive().optional(),
   max_attendees: z.number().int().positive().optional(),
