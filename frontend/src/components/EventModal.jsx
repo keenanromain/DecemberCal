@@ -195,7 +195,7 @@ export default function EventModal({
             </FormControl>
 
             <FormControl>
-              <FormLabel>Online Link</FormLabel>
+              <FormLabel>Online Link <small>(optional)</small></FormLabel>
               <Input
                 value={onlineLink}
                 onChange={(e) => setOnlineLink(e.target.value)}
@@ -224,7 +224,7 @@ export default function EventModal({
 
             <SimpleGrid columns={[1, 2]} spacing={4}>
               <FormControl>
-                <FormLabel>Min Attendees</FormLabel>
+                <FormLabel>Min Attendees <small>(optional)</small></FormLabel>
                 <NumberInput
                   min={0}
                   value={minAttendees}
@@ -235,7 +235,7 @@ export default function EventModal({
               </FormControl>
 
               <FormControl>
-                <FormLabel>Max Attendees</FormLabel>
+                <FormLabel>Max Attendees <small>(optional)</small></FormLabel>
                 <NumberInput
                   min={0}
                   value={maxAttendees}
@@ -247,7 +247,7 @@ export default function EventModal({
             </SimpleGrid>
 
             <FormControl>
-              <FormLabel>Location Notes</FormLabel>
+              <FormLabel>Location Notes <small>(optional)</small></FormLabel>
               <Textarea
                 value={locationNotes}
                 onChange={(e) => setLocationNotes(e.target.value)}
@@ -255,7 +255,7 @@ export default function EventModal({
             </FormControl>
 
             <FormControl>
-              <FormLabel>Preparation Notes</FormLabel>
+              <FormLabel>Preparation Notes <small>(optional)</small></FormLabel>
               <Textarea
                 value={prepNotes}
                 onChange={(e) => setPrepNotes(e.target.value)}

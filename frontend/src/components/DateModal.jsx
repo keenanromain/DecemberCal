@@ -246,7 +246,6 @@ export default function DateModal({
 
         <ModalBody>
           <VStack spacing={4} align="stretch">
-            {/* Date (editable so you can move events around) */}
             <FormControl isRequired>
               <FormLabel>Date</FormLabel>
               <Input
@@ -265,7 +264,7 @@ export default function DateModal({
               />
             </FormControl>
 
-            <FormControl>
+            <FormControl isRequired>
               <FormLabel>Description</FormLabel>
               <Textarea
                 value={description}
@@ -274,7 +273,7 @@ export default function DateModal({
               />
             </FormControl>
 
-            <FormControl>
+            <FormControl isRequired>
               <FormLabel>Location</FormLabel>
               <Input
                 value={location}
