@@ -39,52 +39,38 @@ Once the stack is running, the application can be accessed locally at:
 ```
 http://localhost:8080/
 ```
-
+---
 ## Table of Contents
-1. <a href="#postgres">PostgresL</a>
+1. <a href="#postgres">Postgres</a>
 
 2. <a href="#read-service-go">Read-Service (Go)</a>
 
 3. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
 
 4. <a href="#frontend">Frontend</a>
-
-## PostgreSQL
+---
+## Postgres
 
 ### Overview
 
-The database architecture follows a Command Query Responsibility Segregation (CQRS) pattern where:
+The database architecture follows a *Command Query Responsibility Segregation (CQRS)* pattern where:
 
 - **write-service** (TypeScript) performs all `INSERT`, `UPDATE`, and `DELETE` operations.
-- **read-service** (Go) reads data and exposes a high-performance, read-optimized API.
+- **read-service** (Go) reads data and exposes a high-performance, read-optimized SSE stream.
 
-This separation ensures:
-- Higher throughput under load  
+Separating reads from writes was a design decision to ensure:
+- Higher throughput under application load  
 - Cleaner separation of concerns  
 - A more scalable and predictable architecture
 
 ### Schema
 
-The primary table is:
+The primary `events `table:
+<img width="1065" height="395" alt="Image" src="https://github.com/user-attachments/assets/8fd4a93d-13e1-45b5-939e-857e6ed4eb56" />
 
-### `Event`
-| Column             | Type      | Notes                                      |
-|--------------------|-----------|--------------------------------------------|
-| `id`               | UUID      | Primary key                                |
-| `name`             | TEXT      | Required                                   |
-| `description`      | TEXT      | Optional                                   |
-| `start`            | TIMESTAMP | Required, ISO 8601                         |
-| `end`              | TIMESTAMP | Required                                   |
-| `location`         | TEXT      | Optional                                   |
-| `online_link`      | TEXT      | Optional                                   |
-| `min_attendees`    | INT       | Optional                                   |
-| `max_attendees`    | INT       | Optional                                   |
-| `location_notes`   | TEXT      | Optional                                   |
-| `preparation_notes`| TEXT      | Optional                                   |
-| `created_at`       | TIMESTAMP | Auto-generated                             |
-| `updated_at`       | TIMESTAMP | Auto-updated                               |
-
----
+The `events_read` is a read replica table that is updated via triggers:
+<img width="372" height="62" alt="Image" src="https://github.com/user-attachments/assets/8be66e39-d821-4c4d-8724-d9b6f9a428d1" />
+from `services/write-service-ts/prisma/migrations/20250102_events_read_replica/migration.sql`
 
 ### Docker Configuration
 
@@ -108,24 +94,12 @@ postgres:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    ...
-    ...
-    ...
-    ...
+
 volumes:
   postgres-data:
 ```
 
-Docker Compose confirms DB readiness via the healtcheck above. The other services only boot once the DB is accepting connections.
-
-The Postgres service manages two primary tables:
-
-`events` – The system’s authoritative write model.
-All create/update/delete operations are performed against this table by the write-service. It stores the canonical event objects created by the application.
-
-`events_read` – A read-optimized replica of the events table.
-This table is connected to the read-service and is structured to support fast, query-heavy operations. This is would help to scale reads independently from writes if need be.
-
+Docker Compose confirms DB readiness via the `healtcheck` above. The other services only boot once the DB is accepting connections.
 
 ---
 
