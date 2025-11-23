@@ -27,32 +27,53 @@ export default function Calendar() {
     }
   }
 
-// Live SSE updates
-useEffect(() => {
-  loadEvents(); // initial fetch
+  // Live SSE updates
+  useEffect(() => {
+    loadEvents(); // initial fetch
 
-  const source = new EventSource("http://localhost:4001/events/stream");
+    const source = new EventSource("http://localhost:4001/events/stream");
 
-  source.onmessage = () => {
-    loadEvents(); // whenever backend pushes refresh
-  };
+    // Default unnamed SSE message handler
+    source.onmessage = (evt) => {
+      try {
+        const payload = JSON.parse(evt.data);
+        console.log("[SSE] message received:", payload);
 
-  source.onerror = (err) => {
-    console.error("SSE error:", err);
-  };
+        // Only reload data when backend explicitly says so
+        if (payload.type === "refresh") {
+          loadEvents();
+        }
+      } catch (err) {
+        console.error("[SSE] invalid JSON:", evt.data);
+      }
+    };
 
-  return () => source.close();
-}, []);
+    // Connection open
+    source.onopen = () => {
+      console.log("[SSE] connected");
+    };
+
+    // Errors or disconnects
+    source.onerror = (err) => {
+      console.error("[SSE] error:", err);
+      // Do NOT close — EventSource auto-reconnects
+    };
+
+    return () => {
+      console.log("[SSE] closing stream");
+      source.close();
+    };
+  }, []);
 
   // Hardcode December 2025
   const year = 2025;
-  const month = 11; // December (zero-indexed)
+  const month = 11; // December (0-indexed)
   const monthDays = getDaysInMonth(year, month);
 
   // Group events by date
   const eventsByDate = {};
   for (const ev of events) {
-    const date = new Date(ev.start).toISOString().split("T")[0]; // YYYY-MM-DD
+    const date = new Date(ev.start).toISOString().split("T")[0];
     if (!eventsByDate[date]) eventsByDate[date] = [];
     eventsByDate[date].push(ev);
   }
@@ -63,7 +84,6 @@ useEffect(() => {
         December 2025
       </Heading>
 
-      {/* Weekday labels */}
       <Grid templateColumns="repeat(7, 1fr)" textAlign="center" mb={4}>
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dow) => (
           <Text key={dow} fontWeight="bold" fontSize="lg">
@@ -72,7 +92,6 @@ useEffect(() => {
         ))}
       </Grid>
 
-      {/* Calendar grid */}
       <Grid templateColumns="repeat(7, 1fr)" gap={4}>
         {monthDays.map((day) => {
           const dateKey = day.toISOString().split("T")[0];
@@ -90,12 +109,10 @@ useEffect(() => {
                 _hover={{ bg: "gray.100" }}
                 transition="0.2s"
               >
-                {/* Day number */}
                 <Text fontWeight="bold" fontSize="lg">
                   {day.getDate()}
                 </Text>
 
-                {/* Events */}
                 {todaysEvents.length === 0 ? (
                   <Text
                     fontSize="sm"
