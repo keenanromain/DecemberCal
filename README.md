@@ -25,7 +25,8 @@ read-service
 frontend 
  - NGINX Configuration
 
-Data Flow looks like the following:
+Data flow looks like the following:
+
 ``
 frontend → write-service → events table → events_read table → read-service → SSE → frontend
 ``
