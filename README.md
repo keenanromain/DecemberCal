@@ -119,18 +119,17 @@ This service:
 
 ###  Endpoints
 
-```json
-GET /events
-```
+- `GET /events`
+
 Returns the full list of events.
-``json
-GET /events/{id}
-```
+
+- `GET /events/{id}`
+
 Returns a single event by UUID.
-```json
-GET /events/stream
-```
-Returns a ontinuous SSE stream that emits `{ "type": "refresh" }` and a periodic heartbeat.
+
+- `GET /events/stream`
+
+Returns a continuous SSE stream that emits `{ "type": "refresh" }` and a periodic heartbeat.
 
 ### Architecture
 1. Go + Gorilla Mux
@@ -154,13 +153,11 @@ Headers: Content-Type
 The service remains secure because the service is read-only.
 
 ### Health Check
-```json
-GET /healthz
-```
+`GET /healthz`
+
 Returns the following when healthy
-```json
-{ "status": "ok", "service": "read-service" }
-```
+
+`{ "status": "ok", "service": "read-service" }`
 
 ## Write-Service (TypeScript / Express)
 
