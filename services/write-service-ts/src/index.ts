@@ -112,7 +112,7 @@ app.use((req, res, next) => {
 });
 
 // Start server
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
+const port = Number(process.env.PORT) || 4000;
+app.listen(port, "0.0.0.0", () => {
   console.log(`[write-service-ts] listening on port ${port}`);
 });
