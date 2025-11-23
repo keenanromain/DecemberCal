@@ -1,11 +1,6 @@
-// ---------------------------------------------------------
-// DecemberCal — Prisma Schema (Write Service)
-// ---------------------------------------------------------
-
 generator client {
-  provider = "prisma-client-js"
-  // binaryTargets ensures Prisma generates the correct engines
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -14,19 +9,35 @@ datasource db {
 }
 
 model Event {
-  id               String   @id @default(uuid())
-  name             String
-  description      String
-  start            DateTime
-  end              DateTime
-  location         String?
-  online_link      String?
-  min_attendees    Int?
-  max_attendees    Int?
-  location_notes   String?
+  id                String    @id @default(uuid())
+  name              String
+  description       String
+  start             DateTime  @db.Timestamp(3)
+  end               DateTime  @db.Timestamp(3)
+  location          String?
+  online_link       String?
+  min_attendees     Int?
+  max_attendees     Int?
+  location_notes    String?
   preparation_notes String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @default(now()) @updatedAt
+  created_at        DateTime  @default(now()) @db.Timestamp(3)
+  updated_at        DateTime  @default(now()) @db.Timestamp(3)
+}
 
-  @@map("events") // map to existing Postgres table
+model EventsRead {
+  id                String    @id
+  name              String
+  description       String
+  start             DateTime  @db.Timestamp(3)
+  end               DateTime  @db.Timestamp(3)
+  location          String?
+  online_link       String?
+  min_attendees     Int?
+  max_attendees     Int?
+  location_notes    String?
+  preparation_notes String?
+  created_at        DateTime  @default(now()) @db.Timestamp(3)
+  updated_at        DateTime  @default(now()) @db.Timestamp(3)
+
+  @@map("events_read")
 }
