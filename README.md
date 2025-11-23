@@ -119,15 +119,18 @@ This service:
 
 ###  Endpoints
 
-### **GET /events**
+```json
+GET /events
+```
 Returns the full list of events.
-
-### **GET /events/{id}**
+``json
+GET /events/{id}
+```
 Returns a single event by UUID.
-
-### **GET /events/stream**
-Continuous SSE stream that emits `{ "type": "refresh" }` and a heartbeat.
-
+```json
+GET /events/stream
+```
+Returns a ontinuous SSE stream that emits `{ "type": "refresh" }` and a periodic heartbeat.
 
 ### Architecture
 1. Go + Gorilla Mux
@@ -143,18 +146,19 @@ A custom hub that ensures safe concurrent writes via channels, auto-reconnects, 
 Connections are pooled and reused for efficiency.
 
 4. CORS Configuration
-```Origin: *
+```json
+Origin: *
 Methods: GET, OPTIONS
 Headers: Content-Type
 ```
 The service remains secure because the service is read-only.
 
 ### Health Check
-```
+```json
 GET /healthz
 ```
-returns
-```
+Returns the following when healthy
+```json
 { "status": "ok", "service": "read-service" }
 ```
 
