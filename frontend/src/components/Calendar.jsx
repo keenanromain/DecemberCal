@@ -20,26 +20,20 @@ const DECEMBER_MONTH_INDEX = 11; // December
 
 function buildDecemberGrid() {
   const days = [];
-
   const firstOfMonth = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX, 1);
   const lastOfMonth = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX + 1, 0);
-
   const daysInMonth = lastOfMonth.getDate();
-  const firstWeekday = firstOfMonth.getDay(); // 0 = Sun
+  const firstWeekday = firstOfMonth.getDay();
 
-  // leading empty cells
   for (let i = 0; i < firstWeekday; i++) days.push(null);
-
-  // 1–31
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
-
   return days;
 }
 
 export default function Calendar() {
   const [events, setEvents] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
-  const [selectedEvent, setSelectedEvent] = useState(null); // event object
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const bgDay = useColorModeValue("white", "gray.800");
   const bgHover = useColorModeValue("blue.50", "blue.900");
@@ -48,7 +42,6 @@ export default function Calendar() {
   const days = buildDecemberGrid();
   const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  // ---- REST loader ----
   const loadEvents = async () => {
     try {
       const res = await readClient.get("/events");
@@ -58,17 +51,13 @@ export default function Calendar() {
     }
   };
 
-  // ---- SSE stream ----
   useEffect(() => {
     loadEvents();
+    const source = new EventSource("http://localhost:4001/events/stream");
 
-    const sseUrl = "http://localhost:4001/events/stream";
-    console.log("[SSE] connecting to:", sseUrl);
-    const source = new EventSource(sseUrl);
-
-    source.addEventListener("connected", (evt) => {
-      console.log("[SSE] connected:", evt.data);
-    });
+    source.addEventListener("connected", (evt) =>
+      console.log("[SSE] connected:", evt.data)
+    );
 
     source.addEventListener("update", (evt) => {
       try {
@@ -84,7 +73,6 @@ export default function Calendar() {
     return () => source.close();
   }, []);
 
-  // ---- Group events by date ----
   const eventsByDate = useMemo(() => {
     const map = {};
     for (const ev of events) {
@@ -96,7 +84,6 @@ export default function Calendar() {
     return map;
   }, [events]);
 
-  // ---- Click handlers ----
   const handleDayClick = (day) => {
     if (!day) return;
     const iso = `2025-12-${String(day).padStart(2, "0")}`;
@@ -130,7 +117,6 @@ export default function Calendar() {
             </Text>
           </VStack>
 
-          {/* Week headings */}
           <Grid
             templateColumns="repeat(7, 1fr)"
             textAlign="center"
@@ -147,7 +133,6 @@ export default function Calendar() {
             ))}
           </Grid>
 
-          {/* Day grid */}
           <Grid templateColumns="repeat(7, 1fr)" gap={3} py={4}>
             {days.map((day, idx) => {
               if (day === null) return <Box key={idx} />;
