@@ -1,18 +1,30 @@
-FROM node:20-slim
-
-RUN apt-get update && \
-    apt-get install -y wget && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# ------------------------------
+# 1. Build Stage
+# ------------------------------
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package*.json ./
 RUN npm install
 
+COPY .env.production .env.production
 COPY . .
+RUN npm run build
 
-EXPOSE 5173
+# ------------------------------
+# 2. Production Stage
+# ------------------------------
+FROM nginx:1.25-alpine
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
 
+# Add your config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy built files from Builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
