@@ -50,7 +50,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5
