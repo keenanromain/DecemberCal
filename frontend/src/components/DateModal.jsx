@@ -1,114 +1,140 @@
-import React, { useState } from "react";
+// src/components/DateModal.jsx
+import React, { useEffect, useState } from "react";
 import {
     Modal,
     ModalOverlay,
     ModalContent,
     ModalHeader,
-    ModalCloseButton,
     ModalBody,
+    ModalCloseButton,
     ModalFooter,
     Button,
     FormControl,
     FormLabel,
     Input,
     Textarea,
-    VStack,
+    NumberInput,
+    NumberInputField,
     useToast,
+    SimpleGrid,
+    VStack,
 } from "@chakra-ui/react";
+import eventsApi, { WRITE_API } from "../api/events";
 
-export default function DateModal({ isOpen, onClose, dateISO }) {
+const { writeClient } = eventsApi;
+
+function formatNiceDate(dateISO) {
+    if (!dateISO) return "";
+    const [year, month, day] = dateISO.split("-").map(Number);
+    const d = new Date(year, month - 1, day); // local date, no TZ shift
+    return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+}
+
+export default function DateModal({ dateISO, isOpen, onClose, onCreated }) {
     const toast = useToast();
 
-    const [form, setForm] = useState({
-        name: "",
-        description: "",
-        location: "",
-        startTime: "12:00",
-        endTime: "13:00",
-        minAttendees: "",
-        maxAttendees: "",
-    });
+    // basic guard
+    useEffect(() => {
+        if (!isOpen) return;
+        // reset when opening
+        setName("");
+        setDescription("");
+        setLocation("");
+        setOnlineLink("");
+        setStartTime("12:00");
+        setEndTime("13:00");
+        setMinAttendees("");
+        setMaxAttendees("");
+        setLocationNotes("");
+        setPreparationNotes("");
+    }, [isOpen, dateISO]);
 
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
+    const [name, setName] = useState("");
+    const [description, setDescription] = useState("");
+    const [location, setLocation] = useState("");
+    const [onlineLink, setOnlineLink] = useState("");
+    const [startTime, setStartTime] = useState("12:00");
+    const [endTime, setEndTime] = useState("13:00");
+    const [minAttendees, setMinAttendees] = useState("");
+    const [maxAttendees, setMaxAttendees] = useState("");
+    const [locationNotes, setLocationNotes] = useState("");
+    const [preparationNotes, setPreparationNotes] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = async () => {
-        // Construct full ISO datetime from selected date + time fields
-        const start = `${dateISO}T${form.startTime}:00.000Z`;
-        const end = `${dateISO}T${form.endTime}:00.000Z`;
-
-        const payload = {
-            name: form.name,
-            description: form.description,
-            location: form.location,
-            start,
-            end,
-            min_attendees: form.minAttendees ? Number(form.minAttendees) : undefined,
-            max_attendees: form.maxAttendees ? Number(form.maxAttendees) : undefined,
-        };
+    const handleSubmit = async (e) => {
+        e?.preventDefault?.();
+        if (!dateISO) return;
 
         try {
-            const res = await fetch("http://localhost:4000/events", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
+            setSubmitting(true);
 
-            if (!res.ok) throw new Error("Submit failed");
+            const start = new Date(`${dateISO}T${startTime}:00`);
+            const end = new Date(`${dateISO}T${endTime}:00`);
+
+            const payload = {
+                name,
+                description: description || "",
+                start: start.toISOString(),
+                end: end.toISOString(),
+                // Zod rule: must have either location or online_link
+                location: location || undefined,
+                online_link: onlineLink || undefined,
+                min_attendees: minAttendees ? Number(minAttendees) : undefined,
+                max_attendees: maxAttendees ? Number(maxAttendees) : undefined,
+                location_notes: locationNotes || undefined,
+                preparation_notes: preparationNotes || undefined,
+            };
+
+            await writeClient.post("/events", payload);
+
 
             toast({
-                title: "Event created!",
+                title: "Event created",
+                description: "Your event has been added to the calendar.",
                 status: "success",
-                duration: 2500,
+                duration: 3000,
                 isClosable: true,
             });
 
-            onClose(true); // signal success to parent (calendar)
+            onClose?.();
+            onCreated?.();
         } catch (err) {
+            console.error("[DateModal] create event failed:", err);
             toast({
-                title: "Error creating event",
+                title: "Error",
+                description:
+                    "Failed to create event. Make sure required fields are filled.",
                 status: "error",
-                duration: 2500,
+                duration: 4000,
                 isClosable: true,
             });
-
-            onClose(false);
+        } finally {
+            setSubmitting(false);
         }
     };
 
+    if (!dateISO) return null;
+
     return (
-        <Modal isOpen={isOpen} onClose={() => onClose(false)}>
+        <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
             <ModalOverlay />
-            <ModalContent>
+            <ModalContent as="form" onSubmit={handleSubmit}>
                 <ModalHeader>
-                    Create Event – {(() => {
-                        if (!dateISO) return "";
-
-                        const [year, month, day] = dateISO.split("-").map(Number);
-                        const d = new Date(year, month - 1, day); // local date, no timezone shift
-
-                        return d.toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                        });
-                    })()}
+                    Create Event – {formatNiceDate(dateISO)}
                 </ModalHeader>
-
-
-
                 <ModalCloseButton />
 
                 <ModalBody>
-                    <VStack spacing={4}>
-
-                        <FormControl>
+                    <VStack spacing={4} align="stretch">
+                        <FormControl isRequired>
                             <FormLabel>Name</FormLabel>
                             <Input
-                                name="name"
-                                value={form.name}
-                                onChange={handleChange}
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 placeholder="Event name"
                             />
                         </FormControl>
@@ -116,68 +142,102 @@ export default function DateModal({ isOpen, onClose, dateISO }) {
                         <FormControl>
                             <FormLabel>Description</FormLabel>
                             <Textarea
-                                name="description"
-                                value={form.description}
-                                onChange={handleChange}
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Event details…"
                             />
                         </FormControl>
 
                         <FormControl>
                             <FormLabel>Location</FormLabel>
                             <Input
-                                name="location"
-                                value={form.location}
-                                onChange={handleChange}
-                            />
-                        </FormControl>
-
-                        {/* Time fields */}
-                        <FormControl>
-                            <FormLabel>Start Time</FormLabel>
-                            <Input
-                                type="time"
-                                name="startTime"
-                                value={form.startTime}
-                                onChange={handleChange}
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                placeholder="Physical location (or leave blank if online)"
                             />
                         </FormControl>
 
                         <FormControl>
-                            <FormLabel>End Time</FormLabel>
+                            <FormLabel>Online Link (optional)</FormLabel>
                             <Input
-                                type="time"
-                                name="endTime"
-                                value={form.endTime}
-                                onChange={handleChange}
+                                value={onlineLink}
+                                onChange={(e) => setOnlineLink(e.target.value)}
+                                placeholder="https://…"
+                            />
+                        </FormControl>
+
+                        <SimpleGrid columns={[1, 2]} spacing={4}>
+                            <FormControl>
+                                <FormLabel>Start Time</FormLabel>
+                                <Input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                />
+                            </FormControl>
+                            <FormControl>
+                                <FormLabel>End Time</FormLabel>
+                                <Input
+                                    type="time"
+                                    value={endTime}
+                                    onChange={(e) => setEndTime(e.target.value)}
+                                />
+                            </FormControl>
+                        </SimpleGrid>
+
+                        <SimpleGrid columns={[1, 2]} spacing={4}>
+                            <FormControl>
+                                <FormLabel>Min Attendees</FormLabel>
+                                <NumberInput
+                                    min={0}
+                                    value={minAttendees}
+                                    onChange={(v) => setMinAttendees(v)}
+                                >
+                                    <NumberInputField />
+                                </NumberInput>
+                            </FormControl>
+                            <FormControl>
+                                <FormLabel>Max Attendees</FormLabel>
+                                <NumberInput
+                                    min={0}
+                                    value={maxAttendees}
+                                    onChange={(v) => setMaxAttendees(v)}
+                                >
+                                    <NumberInputField />
+                                </NumberInput>
+                            </FormControl>
+                        </SimpleGrid>
+
+                        <FormControl>
+                            <FormLabel>Location Notes (optional)</FormLabel>
+                            <Textarea
+                                value={locationNotes}
+                                onChange={(e) => setLocationNotes(e.target.value)}
+                                placeholder="Building, floor, parking notes…"
                             />
                         </FormControl>
 
                         <FormControl>
-                            <FormLabel>Min Attendees</FormLabel>
-                            <Input
-                                type="number"
-                                name="minAttendees"
-                                value={form.minAttendees}
-                                onChange={handleChange}
+                            <FormLabel>Preparation Notes (optional)</FormLabel>
+                            <Textarea
+                                value={preparationNotes}
+                                onChange={(e) => setPreparationNotes(e.target.value)}
+                                placeholder="Things to bring, setup instructions…"
                             />
                         </FormControl>
-
-                        <FormControl>
-                            <FormLabel>Max Attendees</FormLabel>
-                            <Input
-                                type="number"
-                                name="maxAttendees"
-                                value={form.maxAttendees}
-                                onChange={handleChange}
-                            />
-                        </FormControl>
-
                     </VStack>
                 </ModalBody>
 
                 <ModalFooter>
-                    <Button colorScheme="blue" onClick={handleSubmit}>
-                        Submit
+                    <Button mr={3} onClick={onClose} variant="ghost">
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        colorScheme="blue"
+                        isLoading={submitting}
+                    >
+                        Create Event
                     </Button>
                 </ModalFooter>
             </ModalContent>
