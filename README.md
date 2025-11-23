@@ -65,12 +65,13 @@ Separating reads from writes was a design decision to ensure:
 
 ### Schema
 
-The primary `events `table:
+The primary `events` table:
 <img width="1065" height="395" alt="Image" src="https://github.com/user-attachments/assets/8fd4a93d-13e1-45b5-939e-857e6ed4eb56" />
 
 The `events_read` is a read replica table that is updated via triggers:
 <img width="372" height="62" alt="Image" src="https://github.com/user-attachments/assets/8be66e39-d821-4c4d-8724-d9b6f9a428d1" />
-from `services/write-service-ts/prisma/migrations/20250102_events_read_replica/migration.sql`
+
+as seen in `services/write-service-ts/prisma/migrations/20250102_events_read_replica/migration.sql`
 
 ### Docker Configuration
 
@@ -105,24 +106,18 @@ Docker Compose confirms DB readiness via the `healtcheck` above. The other servi
 
 ## Read-Service (Go) 
 
-The **read-service** is the **Query** side of the CQRS architecture.  
-It is highly optimized for fast, read-heavy workloads and powers the frontend calendar.
+The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads.
 
----
-
-## 🚀 Purpose
+### Overview
 
 This service:
 
 - Exposes **GET /events** and **GET /events/{id}**
-- Streams live updates using **Server-Sent Events (SSE)**
-- Never mutates data — read-only by design
-- Offers fast JSON responses backed by PostgreSQL
+- Streams using **Server-Sent Events (SSE)** for instant UI updates
+- Is read-only by design
+- Can scale independently with replicas
 
-
----
-
-## 📡 Endpoints
+###  Endpoints
 
 ### **GET /events**
 Returns the full list of events.
@@ -131,42 +126,30 @@ Returns the full list of events.
 Returns a single event by UUID.
 
 ### **GET /events/stream**
-Continuous SSE stream that emits:
+Continuous SSE stream that emits `{ "type": "refresh" }` and a heartbeat.
 
-```json
-{ "type": "refresh" }
-```
 
-The frontend listens for these events and reloads data instantly after any event creation, update, or deletion.
-
-🔧 Architecture Highlights
+### Architecture
 1. Go + Gorilla Mux
 
-Go provides low-latency JSON APIs, suitable for high-throughput read operations.
+Go provides low-latency JSON APIs that are useful for high-throughput read operations.
 
 2. SSE Hub (broadcast model)
 
-A custom hub handles all live connections:
-
-Auto-reconnect
-
-Safe concurrent writes via channels
-
-No polling or WebSocket overhead
+A custom hub that ensures safe concurrent writes via channels, auto-reconnects, and no polling.
 
 3. Database access
 
 Connections are pooled and reused for efficiency.
 
-CORS Configuration:
-````
-Origin: *
+4. CORS Configuration
+```Origin: *
 Methods: GET, OPTIONS
 Headers: Content-Type
 ```
-The service remains secure because the API surface is read-only.
+The service remains secure because the service is read-only.
 
-🧪 Health Check
+### Health Check
 ```
 GET /healthz
 ```
@@ -174,16 +157,6 @@ returns
 ```
 { "status": "ok", "service": "read-service" }
 ```
-
-Key Technical Merits
-
-Perfect fit for CQRS: Zero write logic → simpler, faster reads
-
-High-performance SSE: Instant UI updates
-
-Isolated scalability: Read-side can scale independently with replicas
-
-Robust concurrency: Idiomatic Go channel patterns
 
 ## Write-Service (TypeScript / Express)
 
