@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import DecemberDateTimePicker from "./DecemberDateTimePicker";
+
 import {
   Box,
   Button,
@@ -117,21 +119,19 @@ export default function EventForm() {
           <SimpleGrid columns={[1, 2]} spacing={6}>
             <FormControl>
               <FormLabel>Start</FormLabel>
-              <Input
-                type="datetime-local"
-                name="start"
+              <DecemberDateTimePicker
+                label="Start"
                 value={form.start}
-                onChange={handleChange}
+                onChange={(iso) => setForm({ ...form, start: iso })}
               />
             </FormControl>
 
             <FormControl>
               <FormLabel>End</FormLabel>
-              <Input
-                type="datetime-local"
-                name="end"
+              <DecemberDateTimePicker
+                label="End"
                 value={form.end}
-                onChange={handleChange}
+                onChange={(iso) => setForm({ ...form, end: iso })}
               />
             </FormControl>
           </SimpleGrid>
