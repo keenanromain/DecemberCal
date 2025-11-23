@@ -119,15 +119,15 @@ This service:
 
 ###  Endpoints
 
-- `GET /events`
+#### `GET /events`
 
 Returns the full list of events.
 
-- `GET /events/{id}`
+#### `GET /events/{id}`
 
 Returns a single event by UUID.
 
-- `GET /events/stream`
+#### `GET /events/stream`
 
 Returns a continuous SSE stream that emits `{ "type": "refresh" }` and a periodic heartbeat.
 
