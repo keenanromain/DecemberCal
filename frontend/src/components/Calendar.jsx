@@ -1,149 +1,157 @@
-import React, { useState, useEffect } from "react";
-import { Box, Text, Grid, GridItem, Heading } from "@chakra-ui/react";
+// src/components/Calendar.jsx
+import React, { useState } from "react";
+import {
+  Box,
+  Grid,
+  GridItem,
+  Heading,
+  Text,
+  VStack,
+  useColorModeValue,
+} from "@chakra-ui/react";
 
-// Utility: Get all days in a specific month
-function getDaysInMonth(year, month) {
-  const date = new Date(year, month, 1);
+import DateModal from "./DateModal";
+
+const DECEMBER_YEAR = 2025;
+const DECEMBER_MONTH_INDEX = 11; // December
+
+// Build the grid (Sunday-first)
+function buildDecemberGrid() {
   const days = [];
 
-  while (date.getMonth() === month) {
-    days.push(new Date(date));
-    date.setDate(date.getDate() + 1);
+  const firstOfMonth = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX, 1);
+  const lastOfMonth = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX + 1, 0);
+
+  const daysInMonth = lastOfMonth.getDate();
+
+  // JS getDay(): 0 = Sunday, 1 = Monday, ... 6 = Saturday
+  const firstWeekday = firstOfMonth.getDay(); // Sunday-first layout
+
+  // Add leading blanks
+  for (let i = 0; i < firstWeekday; i++) {
+    days.push(null);
+  }
+
+  // Add days 1–31
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(d);
   }
 
   return days;
 }
 
 export default function Calendar() {
-  const [events, setEvents] = useState([]);
+  const days = buildDecemberGrid();
+  const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  async function loadEvents() {
-    try {
-      const res = await fetch("http://localhost:4001/events");
-      const data = await res.json();
-      setEvents(data);
-    } catch (err) {
-      console.error("Failed to load events:", err);
-    }
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeDateISO, setActiveDateISO] = useState(null);
+
+  function handleDateClick(day) {
+    const iso = `${DECEMBER_YEAR}-12-${String(day).padStart(2, "0")}`;
+    setActiveDateISO(iso);
+    setModalOpen(true);
   }
 
-  // Live SSE updates
-  useEffect(() => {
-    loadEvents(); // initial fetch
-
-    const source = new EventSource("http://localhost:4001/events/stream");
-
-    // Default unnamed SSE message handler
-    source.onmessage = (evt) => {
-      try {
-        const payload = JSON.parse(evt.data);
-        console.log("[SSE] message received:", payload);
-
-        // Only reload data when backend explicitly says so
-        if (payload.type === "refresh") {
-          loadEvents();
-        }
-      } catch (err) {
-        console.error("[SSE] invalid JSON:", evt.data);
-      }
-    };
-
-    // Connection open
-    source.onopen = () => {
-      console.log("[SSE] connected");
-    };
-
-    // Errors or disconnects
-    source.onerror = (err) => {
-      console.error("[SSE] error:", err);
-      // Do NOT close — EventSource auto-reconnects
-    };
-
-    return () => {
-      console.log("[SSE] closing stream");
-      source.close();
-    };
-  }, []);
-
-  // Hardcode December 2025
-  const year = 2025;
-  const month = 11; // December (0-indexed)
-  const monthDays = getDaysInMonth(year, month);
-
-  // Group events by date
-  const eventsByDate = {};
-  for (const ev of events) {
-    const date = new Date(ev.start).toISOString().split("T")[0];
-    if (!eventsByDate[date]) eventsByDate[date] = [];
-    eventsByDate[date].push(ev);
-  }
+  const bgDay = useColorModeValue("white", "gray.800");
+  const bgHover = useColorModeValue("blue.50", "blue.900");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
 
   return (
-    <Box width="100%" maxW="1200px" mx="auto" mt={12} px={4}>
-      <Heading textAlign="center" fontSize="3xl" mb={4}>
-        December 2025
-      </Heading>
-
-      <Grid templateColumns="repeat(7, 1fr)" textAlign="center" mb={4}>
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dow) => (
-          <Text key={dow} fontWeight="bold" fontSize="lg">
-            {dow}
+    <Box minH="100vh" bg={useColorModeValue("gray.100", "gray.900")} py={10}>
+      <Box
+        maxW="1200px"
+        mx="auto"
+        px={[4, 6, 8]}
+        bg={useColorModeValue("white", "gray.800")}
+        rounded="2xl"
+        shadow="xl"
+        borderWidth="1px"
+        borderColor={borderColor}
+      >
+        {/* Header */}
+        <VStack spacing={2} py={6}>
+          <Heading size="lg" textAlign="center">
+            December 2025
+          </Heading>
+          <Text fontSize="md" color="gray.500">
+            Click a date to create an event ✨
           </Text>
-        ))}
-      </Grid>
+        </VStack>
 
-      <Grid templateColumns="repeat(7, 1fr)" gap={4}>
-        {monthDays.map((day) => {
-          const dateKey = day.toISOString().split("T")[0];
-          const todaysEvents = eventsByDate[dateKey] || [];
+        {/* Weekday labels */}
+        <Grid
+          templateColumns="repeat(7, 1fr)"
+          textAlign="center"
+          fontWeight="bold"
+          color="gray.600"
+          pb={3}
+          borderBottomWidth="1px"
+          borderColor={borderColor}
+        >
+          {weekdayLabels.map((label) => (
+            <Box key={label} py={2}>
+              {label}
+            </Box>
+          ))}
+        </Grid>
 
-          return (
-            <GridItem key={dateKey}>
-              <Box
-                borderWidth="1px"
-                rounded="lg"
-                p={3}
-                h="150px"
-                overflowY="auto"
-                bg="gray.50"
-                _hover={{ bg: "gray.100" }}
-                transition="0.2s"
-              >
-                <Text fontWeight="bold" fontSize="lg">
-                  {day.getDate()}
-                </Text>
+        {/* Calendar grid */}
+        <Grid templateColumns="repeat(7, 1fr)" gap={3} py={4} pb={8}>
+          {days.map((day, idx) => {
+            if (day === null) {
+              return <Box key={`empty-${idx}`} />;
+            }
 
-                {todaysEvents.length === 0 ? (
+            return (
+              <GridItem key={day}>
+                <Box
+                  role="button"
+                  cursor="pointer"
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                  rounded="xl"
+                  bg={bgDay}
+                  minH="110px"
+                  p={3}
+                  display="flex"
+                  flexDirection="column"
+                  justifyContent="space-between"
+                  transition="background-color 0.15s ease, transform 0.1s ease"
+                  _hover={{
+                    bg: bgHover,
+                    transform: "translateY(-2px)",
+                  }}
+                  onClick={() => handleDateClick(day)} // <<< IMPORTANT
+                >
+                  {/* Day number */}
+                  <Text fontWeight="bold" fontSize="lg">
+                    {day}
+                  </Text>
+
+                  {/* Placeholder for events */}
                   <Text
-                    fontSize="sm"
-                    color="gray.400"
                     mt={2}
+                    fontSize="xs"
+                    color="gray.400"
                     fontStyle="italic"
                   >
                     No events
                   </Text>
-                ) : (
-                  todaysEvents.map((ev) => (
-                    <Box
-                      key={ev.id}
-                      bg="blue.50"
-                      color="blue.700"
-                      p={1}
-                      rounded="md"
-                      fontSize="xs"
-                      mt={2}
-                      borderWidth="1px"
-                      borderColor="blue.200"
-                    >
-                      {ev.name}
-                    </Box>
-                  ))
-                )}
-              </Box>
-            </GridItem>
-          );
-        })}
-      </Grid>
+                </Box>
+              </GridItem>
+            );
+          })}
+        </Grid>
+      </Box>
+
+      {/* Event creation modal */}
+      <DateModal
+        isOpen={modalOpen}
+        dateISO={activeDateISO}
+        onClose={() => setModalOpen(false)}
+      />
     </Box>
   );
 }

@@ -1,22 +1,16 @@
+// src/App.jsx
 import React from "react";
-import { Box, Container, Heading, Stack } from "@chakra-ui/react";
-import EventForm from "./components/EventForm";
+import { ChakraProvider, Container } from "@chakra-ui/react";
 import Calendar from "./components/Calendar";
 
-export default function App() {
+function App() {
   return (
-    <Container maxW="6xl" py={10}>
-      <Stack spacing={12}>
-        <Box textAlign="center">
-          <Heading size="2xl">DecemberCal</Heading>
-        </Box>
-
+    <ChakraProvider>
+      <Container maxW="container.xl" py={8}>
         <Calendar />
-
-        <EventForm />
-      </Stack>
-    </Container>
+      </Container>
+    </ChakraProvider>
   );
 }
 
-
+export default App;
