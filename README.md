@@ -1,8 +1,41 @@
-# 📦 PostgreSQL database
+Overview
 
-## 🚀 Overview
+This project is a microservice-oriented application composed of four independently containerized services, all orchestrated through a single docker-compose.yml file. The architecture cleanly separates concerns between data storage, data access, data mutation, and user interaction, making it easy to reason about, extend, and deploy.
 
-The database stores the canonical representation of all events. The architecture follows a Command Query Responsibility Segregation (CQRS) pattern where:
+At a high level, the system includes:
+
+Postgres – the central relational database for persistent storage
+
+write-service – the backend service responsible for handling all data creation, updates, and business logic related to writes
+
+read-service – the backend service that exposes optimized, read-only endpoints for fetching application data
+
+frontend – a lightweight UI that interacts with the read/write services over HTTP
+
+To start the environment from scratch, use the helper script:
+
+```
+./docker_refresh.sh
+```
+Once the stack is running, the application can be accessed locally at:
+```
+http://localhost:8080/
+```
+
+## Table of Contents
+1. <a href="#postgres">PostgreSQL</a>
+
+2. <a href="#read-service-go">Read-Service (Go)</a>
+
+3. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
+
+4. <a href="#frontend">Frontend</a>
+
+## PostgreSQL
+
+### Overview
+
+The database architecture follows a Command Query Responsibility Segregation (CQRS) pattern where:
 
 - **write-service** (TypeScript) performs all `INSERT`, `UPDATE`, and `DELETE` operations.
 - **read-service** (Go) reads data and exposes a high-performance, read-optimized API.
@@ -11,9 +44,8 @@ This separation ensures:
 - Higher throughput under load  
 - Cleaner separation of concerns  
 - A more scalable and predictable architecture
----
 
-## 🗄️ Schema
+### Schema
 
 The primary table is:
 
@@ -36,7 +68,7 @@ The primary table is:
 
 ---
 
-## 🔧 Docker Configuration
+### Docker Configuration
 
 The database runs via Docker Compose:
 
@@ -58,21 +90,28 @@ postgres:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-```
-Data is persisted in the root of the same `docker-compose.yml` file:
-```yaml
+    ...
+    ...
+    ...
+    ...
 volumes:
   postgres-data:
-
 ```
+
 Docker Compose confirms DB readiness via the healtcheck above. The other services only boot once the DB is accepting connections.
 
-KEENAN - Write section about read replica
+The Postgres service manages two primary tables:
+
+`events` – The system’s authoritative write model.
+All create/update/delete operations are performed against this table by the write-service. It stores the canonical event objects created by the application.
+
+`events_read` – A read-optimized replica of the events table.
+This table is connected to the read-service and is structured to support fast, query-heavy operations. This is would help to scale reads independently from writes if need be.
 
 
 ---
 
-# Read-Service (Go) 
+## Read-Service (Go) 
 
 The **read-service** is the **Query** side of the CQRS architecture.  
 It is highly optimized for fast, read-heavy workloads and powers the frontend calendar.
@@ -105,6 +144,7 @@ Continuous SSE stream that emits:
 ```json
 { "type": "refresh" }
 ```
+
 The frontend listens for these events and reloads data instantly after any event creation, update, or deletion.
 
 🔧 Architecture Highlights
@@ -153,11 +193,8 @@ Isolated scalability: Read-side can scale independently with replicas
 
 Robust concurrency: Idiomatic Go channel patterns
 
-# Write-Service (TypeScript / Express)
+## Write-Service (TypeScript / Express)
 
-```md
-# ✍️ DecemberCal — Write Service (TypeScript)
-```
 The **write-service** is the Command side of the CQRS architecture.  
 It is responsible for all **mutations**, including:
 
@@ -226,9 +263,7 @@ Consistent error handling across endpoints
 
 The write-service ensures that every write is safe, validated, and broadcasted.
 
-# Frontend Service
-Overview
-
+## Frontend
 This frontend service is a modern, production-ready single-page application built with React, Vite, and Chakra UI, packaged for deployment via Docker and served in production by NGINX. The application renders a December-based calendar UI, displays events streamed from backend services, and provides interfaces for creating, editing, and deleting events with real-time updates.
 
 The architecture emphasizes simplicity, performance, modularity, and cloud-deployability, making it suitable both for local development and for future hosting in a containerized cloud environment.
