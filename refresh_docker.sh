@@ -82,11 +82,11 @@ wait_for_port "localhost" 4001 "Read-service"
 # Read-service healthz
 wait_for_health "http://localhost:4001/healthz" "Read-service"
 
-# Frontend (5173)
-wait_for_port "localhost" 5173 "Frontend"
+# Frontend (8080)
+wait_for_port "localhost" 8080 "Frontend"
 # No healthz — curl index
 for i in $(seq 1 $MAX_RETRIES); do
-  if curl -sf http://localhost:5173 >/dev/null; then
+  if curl -sf http://localhost:8080 >/dev/null; then
     echo "   ➤ Frontend reachable"
     break
   fi
