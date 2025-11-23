@@ -16,20 +16,20 @@ At a high level, the system also includes:
 Postgres 
  - Read Replication
 
-write-service 
- - Database Migrations
-
 read-service 
  - Server Send Events (SSE)
+
+write-service 
+ - Database Migrations
 
 frontend 
  - NGINX Configuration
 
 Data flow looks like the following:
 
-``
+```
 frontend → write-service → events table → events_read table → read-service → SSE → frontend
-``
+```
 
 To start the environment from scratch, use the helper script:
 ```
@@ -39,6 +39,8 @@ Once the stack is running, the application can be accessed locally at:
 ```
 http://localhost:8080/
 ```
+
+Note: All containers ensure that Docker builds and runs for ARM64 architecture to provide consistent builds on my Apple Silicon machine.
 ---
 ## Table of Contents
 1. <a href="#postgres">Postgres</a>
@@ -106,7 +108,7 @@ Docker Compose confirms DB readiness via the `healtcheck` above. The other servi
 
 ## Read-Service (Go) 
 
-The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads.
+The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4001, making the read API available at `http://localhost:4001`.
 
 ### Overview
 
@@ -116,6 +118,7 @@ This service:
 - Streams using **Server-Sent Events (SSE)** for instant UI updates
 - Is read-only by design
 - Can scale independently with replicas
+
 
 ###  Endpoints
 
@@ -145,11 +148,13 @@ A custom hub that ensures safe concurrent writes via channels, auto-reconnects, 
 Connections are pooled and reused for efficiency.
 
 4. CORS Configuration
-```json
+
+```yaml
 Origin: *
 Methods: GET, OPTIONS
 Headers: Content-Type
 ```
+
 The service remains secure because the service is read-only.
 
 ### Health Check
@@ -159,20 +164,22 @@ Returns the following when healthy
 
 `{ "status": "ok", "service": "read-service" }`
 
-## Write-Service (TypeScript / Express)
-
-The **write-service** is the Command side of the CQRS architecture.  
-It is responsible for all **mutations**, including:
-
-- Creating events  
-- Updating events  
-- Deleting events  
 
 ---
+## Write-Service (TypeScript)
 
-## 🚀 Responsibilities
+The **write-service** is the Command side of the CQRS architecture. It is responsible for creating events, updating events, and deleting events. It acts as the authoritative write-path for the system, persisting data into the events table using Prisma ORM.
 
-### **Endpoints**
+
+### Overview
+
+The service runs as compiled JavaScript in `dist/`. TypeScript is compiled into JavaScript only once to avoid the need for ts-node or TypeScript dependencies at runtime. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4000, making the read API available at `http://localhost:4000`.
+
+
+### Endpoints
+
+Express serves as the HTTP server layer for the write-service:
+
 | Method | Route            | Description                         |
 |--------|------------------|-------------------------------------|
 | POST   | `/events`        | Create a new event                  |
@@ -180,28 +187,11 @@ It is responsible for all **mutations**, including:
 | DELETE | `/events/:id`    | Delete an event                     |
 | GET    | `/healthz`       | Health check                        |
 
-### **Strict Method Enforcement**
-All routes except `/healthz` reject GET requests
+Because of strict method enforcement, **all** routes except `/healthz` reject GET requests.
 
+### Validation
 
-This enforces **Command-only behavior**.
-
----
-
-## 🧰 Technology Stack
-
-- **Node.js + Express**
-- **Prisma ORM**
-- **Zod validation schema**
-- **PostgreSQL**
-- **Dockerized environment**
-- Runs as compiled JS (`dist/`) in production
-
----
-
-## 🔒 Validation (Zod)
-
-Payloads are validated using a strict schema:
+Payloads are validated using Zod:
 
 - Required: name, start, end
 - Must have **either** location **or** online_link
@@ -209,26 +199,22 @@ Payloads are validated using a strict schema:
 - Optional notes and numeric fields
 - End time must be after start
 
-This ensures **all malformed requests are rejected early**.
+This ensures that all malformed requests are rejected early.
 
-🧪 Health Check
-GET /healthz → { "status": "ok", "service": "write-service" }
-Key Technical Merits
 
-Clear separation of concerns
+### Database Migrations
 
-Strong schema validation via Zod
+Migrations occur during runtime with `services/write-service-tes/entrypoint.sh`. Any outstanding database migrations are triggered via `npx prisma migrate deploy`.
 
-Prisma’s type-safe database access
+### Health Check
 
-Zero downtime rebuild via Docker
+`GET /healthz`
 
-Direct integration with read-service SSE
+Returns the following when healthy
 
-Consistent error handling across endpoints
+`{ "status": "ok", "service": "write-service" }`
 
-The write-service ensures that every write is safe, validated, and broadcasted.
-
+---
 ## Frontend
 This frontend service is a modern, production-ready single-page application built with React, Vite, and Chakra UI, packaged for deployment via Docker and served in production by NGINX. The application renders a December-based calendar UI, displays events streamed from backend services, and provides interfaces for creating, editing, and deleting events with real-time updates.
 

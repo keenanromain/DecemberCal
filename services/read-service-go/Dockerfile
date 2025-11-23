@@ -26,4 +26,3 @@ COPY --from=builder /app/readsvc ./readsvc
 EXPOSE 4001
 
 CMD ["./readsvc"]
-
