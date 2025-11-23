@@ -35,6 +35,41 @@ export default function EventForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // --- FRONTEND VALIDATION ---
+    if (!form.name.trim() || !form.description.trim() || !form.location.trim()) {
+      toast({
+        title: "Missing required fields",
+        description: "Name, description, and location are required.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (!form.start || !form.end) {
+      toast({
+        title: "Missing date or time",
+        description: "Start and end times are required.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // Backend requires start < end
+    if (new Date(form.end) <= new Date(form.start)) {
+      toast({
+        title: "Invalid time range",
+        description: "End time must be after start time.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
     const payload = {
       name: form.name,
       description: form.description || "",
