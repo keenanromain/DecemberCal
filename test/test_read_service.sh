@@ -86,4 +86,3 @@ require_status 204 "$DEL_STATUS" "Deleted test event"
 
 echo ""
 echo "🎉 Read-service tests complete and ALL PASSED!"
-

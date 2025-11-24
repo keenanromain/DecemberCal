@@ -2,14 +2,31 @@
 set -euo pipefail
 
 BASE_URL="http://localhost:4000"
+
+# Colors
+GREEN="\\033[32m"
+RED="\\033[31m"
+YELLOW="\\033[33m"
+BOLD="\\033[1m"
+RESET="\\033[0m"
+
+# Pretty Headers
+section() {
+  echo -e "\n${BOLD}$1${RESET}"
+}
+
+# Status Helpers
+ok()   { echo -e "${GREEN}✓${RESET} $1"; }
+fail() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
+
 echo "=== Testing Write Service at $BASE_URL ==="
 
-############################################
-# 1. Create a valid event
-############################################
-echo "[1] Creating a valid event (POST /events)..."
+################################################################################
+# 1. CREATE VALID EVENT
+################################################################################
+section "[1] Creating a valid event (POST /events)"
 
-CREATE_RESPONSE=$(curl -s -o /tmp/create_event_out.json -w "%{http_code}" \
+CREATE_STATUS=$(curl -s -o /tmp/create_event_out.json -w "%{http_code}" \
   -X POST "$BASE_URL/events" \
   -H "Content-Type: application/json" \
   -d '{
@@ -22,23 +39,21 @@ CREATE_RESPONSE=$(curl -s -o /tmp/create_event_out.json -w "%{http_code}" \
         "max_attendees": 10
       }')
 
-if [[ "$CREATE_RESPONSE" != "201" ]]; then
-  echo "❌ Event creation failed (status $CREATE_RESPONSE)"
-  cat /tmp/create_event_out.json
-  exit 1
+if [[ "$CREATE_STATUS" != "201" ]]; then
+  fail "Event creation failed (status $CREATE_STATUS)"
 fi
 
 EVENT_ID=$(jq -r '.id' /tmp/create_event_out.json)
-echo "✅ Event created"
-echo "   -> New event ID: $EVENT_ID"
+ok "Event created"
+echo "   → Event ID: $EVENT_ID"
 
 
-############################################
-# 2. Create an invalid event (missing name)
-############################################
-echo "[2] Creating an invalid event (missing required name)..."
+################################################################################
+# 2. CREATE INVALID EVENT (MISSING NAME)
+################################################################################
+section "[2] Creating an invalid event (missing required name)"
 
-INVALID_RESPONSE=$(curl -s -o /tmp/invalid_event.json -w "%{http_code}" \
+INVALID_STATUS=$(curl -s -o /tmp/invalid_event.json -w "%{http_code}" \
   -X POST "$BASE_URL/events" \
   -H "Content-Type: application/json" \
   -d '{
@@ -48,19 +63,19 @@ INVALID_RESPONSE=$(curl -s -o /tmp/invalid_event.json -w "%{http_code}" \
         "end": "2025-12-11T13:00:00Z"
       }')
 
-if [[ "$INVALID_RESPONSE" == "400" ]]; then
-  echo "✅ Invalid event correctly rejected"
+if [[ "$INVALID_STATUS" == "400" ]]; then
+  ok "Invalid event correctly rejected"
 else
-  echo "❌ Invalid event unexpectedly accepted (status $INVALID_RESPONSE)"
+  echo "Response:"
   cat /tmp/invalid_event.json
-  exit 1
+  fail "Invalid event unexpectedly accepted (status $INVALID_STATUS)"
 fi
 
 
-############################################
-# 3. Update event — MUST send a full valid body
-############################################
-echo "[3] Updating event (PUT /events/$EVENT_ID)..."
+################################################################################
+# 3. UPDATE EVENT (PUT)
+################################################################################
+section "[3] Updating event (PUT /events/$EVENT_ID)"
 
 UPDATE_STATUS=$(curl -s -o /tmp/update_event.json -w "%{http_code}" \
   -X PUT "$BASE_URL/events/$EVENT_ID" \
@@ -76,29 +91,29 @@ UPDATE_STATUS=$(curl -s -o /tmp/update_event.json -w "%{http_code}" \
       }")
 
 if [[ "$UPDATE_STATUS" == "200" ]]; then
-  echo "✅ Event updated successfully"
+  ok "Event updated successfully"
 else
-  echo "❌ Failed to update event (status $UPDATE_STATUS)"
+  echo "Response:"
   cat /tmp/update_event.json
-  exit 1
+  fail "Failed to update event (status $UPDATE_STATUS)"
 fi
 
 
-###########################################
+################################################################################
 # 4. DELETE EVENT
-###########################################
-echo "[4] Deleting event (DELETE /events/$EVENT_ID)..."
+################################################################################
+section "[4] Deleting event (DELETE /events/$EVENT_ID)"
 
-DELETE_STATUS=$(curl -s -o /dev/null \
-  -w "%{http_code}" \
+DELETE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
   -X DELETE "$BASE_URL/events/$EVENT_ID")
 
 case "$DELETE_STATUS" in
   204|200)
-    echo "✅ Event deleted successfully (status $DELETE_STATUS)"
+    ok "Event deleted successfully (status $DELETE_STATUS)"
     ;;
   *)
-    echo "❌ Failed to delete event (status $DELETE_STATUS)"
-    exit 1
+    fail "Failed to delete event (status $DELETE_STATUS)"
     ;;
 esac
+
+echo -e "\n${GREEN}${BOLD}🎉 All Write-Service Tests Passed!${RESET}"
