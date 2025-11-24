@@ -375,7 +375,7 @@ curl -sfN http://localhost:4001/events/stream
 
 1. Docker Desktop (Required)
 
-The entire stack (Postgres → Write-service → Read-service → Frontend) runs in Docker containers.
+The entire stack runs in Docker containers.
 
 You must have:
  - Docker Engine 24+
@@ -413,14 +413,20 @@ sudo apt install jq   # Ubuntu/Debian
 jq --version
 ```
 
-4. Node.js (Optional. Only requireed for local frontend development)
+4. Node.js (Optional. This is only required for local frontend development)
 
-If you want to run the frontend locally, outside Docker:
+If you want to run the frontend outside of Docker:
 - Node.js v20+
 - npm v10+
 
 Download:
 https://nodejs.org/en/download 
+
+Verify your install:
+```bash
+node -v
+npm -v
+```
 
 ---
 
@@ -448,6 +454,7 @@ You can run all of the tests from inside the project root:
 All tests live in the `./tests` directory.
 
 ---
+
 ## Out of Scope
 This project is designed to showcase a simple event-driven microservice architecture. To avoid unnecessary complexity and keep my work focused, the following items fall outside the intended functionality:
 
