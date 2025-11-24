@@ -1,4 +1,4 @@
-# DecemberCal 📅
+# 🗓️ DecemberCal 📅
 
 This project is an event-driven calendar application that lets users create, view, update, and delete events that they schedule through a simple web interface.
 
@@ -11,21 +11,9 @@ The project was developed using a microservice architecture composed of four ind
 
 Each service is orchestrated through a single `docker-compose.yml` file found in the root of the respository.
 
-At a high level, the system also includes:
+At a high level, the system also includes Read Replication, Server Send Events (SSE), Database Migrations, `/healthcheckz` endpoints for container orchestration, and NGINX for future hosting in a containerized cloud environment.
 
-Postgres 
- - Read Replication
-
-read-service 
- - Server Send Events (SSE)
-
-write-service 
- - Database Migrations
-
-frontend 
- - NGINX Configuration
-
-Data flow looks like the following:
+The project's data flow:
 
 ```
 frontend → write-service → events table → events_read table → read-service → SSE → frontend
@@ -35,12 +23,13 @@ To start the environment from scratch, use the helper script:
 ```
 ./docker_refresh.sh
 ```
-Once the stack is running, the application can be accessed locally at:
+Once the stack is running, the application can be accessed on the browser at:
 ```
 http://localhost:8080/
 ```
 
-Note: All containers ensure that Docker builds and runs for ARM64 architecture to provide consistent builds on my Apple Silicon machine.
+**Note**: All containers ensure that Docker builds and runs for ARM64 architecture. This was done to provide consistent builds on my Apple Silicon machine.
+
 ---
 ## Table of Contents
 1. <a href="#postgres">Postgres</a>
@@ -52,6 +41,7 @@ Note: All containers ensure that Docker builds and runs for ARM64 architecture t
 4. <a href="#frontend">Frontend</a>
 
 5. <a href="#out-of-scope">Out of Scope</a>
+
 ---
 ## Postgres
 
@@ -75,7 +65,7 @@ The primary `events` table:
 The `events_read` is a read replica table that is updated via triggers:
 <img width="372" height="62" alt="Image" src="https://github.com/user-attachments/assets/8be66e39-d821-4c4d-8724-d9b6f9a428d1" />
 
-as seen in `services/write-service-ts/prisma/migrations/20250102_events_read_replica/migration.sql`
+as seen in `services/write-service-ts/prisma/migrations/20250102_events_read_replica/migration.sql`.
 
 ### Docker Configuration
 
@@ -116,7 +106,7 @@ The **read-service** is the Query side of the CQRS architecture. It is highly op
 
 This service:
 
-- Exposes **GET /events** and **GET /events/{id}**
+- Exposes `GET /events` and `GET /events/{id}`
 - Streams using **Server-Sent Events (SSE)** for instant UI updates
 - Is read-only by design
 - Can scale independently with replicas
@@ -279,10 +269,11 @@ VITE_WRITE_API=http://localhost:4000
 
 ---
 ## Out of Scope
+This project is designed to showcase a simple event-driven microservice architecture. To avoid unnecessary complexity and keep my work focused, the following items fall outside the intended functionality:
 
 1. Search functionality for events (i.e. `GET /search?q={searchQuery}` on a database like ElasticSearch)
 2. Authentication & Authorization (i.e. login required for `POST`, `PUT`, and `DELETE`)
-3. Drag-and-drop events on the UI
+3. Drag-and-drop functionality for existing events on the UI
 4. Hosting in AWS (services likely required: ECR, ECS, RDS, ALB / API Gateway, SSM Parameter Store, CloudWatch, VPC, and Route 53)
 ```
         +-----------------+
