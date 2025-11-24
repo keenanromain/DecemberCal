@@ -7,17 +7,16 @@ BASE_URL="http://localhost:4000"
 GREEN="\\033[32m"
 RED="\\033[31m"
 YELLOW="\\033[33m"
-BOLD="\\033[1m"
 RESET="\\033[0m"
 
 # Pretty Headers
 section() {
-  echo -e "\n${BOLD}$1${RESET}"
+  echo -e "\n$1"
 }
 
 # Status Helpers
-ok()   { echo -e "${GREEN}✓${RESET} $1"; }
-fail() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
+ok()   { echo -e "${GREEN}✅${RESET} $1"; }
+fail() { echo -e "${RED}❌$1${RESET}"; exit 1; }
 
 echo "=== Testing Write Service at $BASE_URL ==="
 
@@ -116,4 +115,4 @@ case "$DELETE_STATUS" in
     ;;
 esac
 
-echo -e "\n${GREEN}${BOLD}🎉 All Write-Service Tests Passed!${RESET}"
+echo -e "\n${GREEN}🎉 All Write-Service Tests Passed!${RESET}"

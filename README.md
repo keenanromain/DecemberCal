@@ -385,10 +385,10 @@ This project includes a shell-based test suite. The tests are lightweight (pure 
 
 You can run all of the tests from inside the project root:
 ```bash
-./test/run_all_tests.sh
+./tests/run_all_tests.sh
 ```
 
-All tests live in the `./test` directory.
+All tests live in the `./tests` directory.
 
 ---
 ## Out of Scope
