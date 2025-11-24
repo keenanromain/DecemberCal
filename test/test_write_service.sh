@@ -1,86 +1,104 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-WRITE_BASE="${WRITE_BASE:-http://localhost:4000}"
-echo "=== Testing Write Service at $WRITE_BASE ==="
+BASE_URL="http://localhost:4000"
+echo "=== Testing Write Service at $BASE_URL ==="
 
-command -v jq >/dev/null 2>&1 || { echo "jq is required but not installed"; exit 1; }
-
-NEW_EVENT_JSON='{
-  "name": "Test Event",
-  "description": "An event created by write-service tests",
-  "start": "2025-12-10T15:00:00.000Z",
-  "end":   "2025-12-10T16:00:00.000Z",
-  "location": "Testville",
-  "min_attendees": 1,
-  "max_attendees": 10
-}'
-
+############################################
+# 1. Create a valid event
+############################################
 echo "[1] Creating a valid event (POST /events)..."
-CREATE_RESP=$(curl -s -o /tmp/write_create_resp.json -w "%{http_code}" \
-  -X POST "$WRITE_BASE/events" \
+
+CREATE_RESPONSE=$(curl -s -o /tmp/create_event_out.json -w "%{http_code}" \
+  -X POST "$BASE_URL/events" \
   -H "Content-Type: application/json" \
-  -d "$NEW_EVENT_JSON")
+  -d '{
+        "name": "Event created from test suite",
+        "description": "Test coverage improvements",
+        "location": "NYC",
+        "start": "2025-12-11T12:00:00Z",
+        "end": "2025-12-11T13:00:00Z",
+        "min_attendees": 5,
+        "max_attendees": 10
+      }')
 
-if [ "$CREATE_RESP" -ne 201 ] && [ "$CREATE_RESP" -ne 200 ]; then
-  echo "❌ Failed to create event (status $CREATE_RESP)"
-  cat /tmp/write_create_resp.json
+if [[ "$CREATE_RESPONSE" != "201" ]]; then
+  echo "❌ Event creation failed (status $CREATE_RESPONSE)"
+  cat /tmp/create_event_out.json
   exit 1
 fi
-echo "✅ Event created (status $CREATE_RESP)"
 
-EVENT_ID=$(jq -r '.id' /tmp/write_create_resp.json)
-if [ -z "$EVENT_ID" ] || [ "$EVENT_ID" == "null" ]; then
-  echo "❌ Response did not contain an 'id' field"
-  cat /tmp/write_create_resp.json
-  exit 1
-fi
+EVENT_ID=$(jq -r '.id' /tmp/create_event_out.json)
+echo "✅ Event created"
 echo "   -> New event ID: $EVENT_ID"
 
+
+############################################
+# 2. Create an invalid event (missing name)
+############################################
 echo "[2] Creating an invalid event (missing required name)..."
-INVALID_JSON='{
-  "description": "Missing name field",
-  "start": "2025-12-10T15:00:00.000Z",
-  "end":   "2025-12-10T16:00:00.000Z",
-  "location": "Nowhere"
-}'
 
-INVALID_STATUS=$(curl -s -o /tmp/write_invalid_resp.json -w "%{http_code}" \
-  -X POST "$WRITE_BASE/events" \
+INVALID_RESPONSE=$(curl -s -o /tmp/invalid_event.json -w "%{http_code}" \
+  -X POST "$BASE_URL/events" \
   -H "Content-Type: application/json" \
-  -d "$INVALID_JSON")
+  -d '{
+        "description": "missing name field",
+        "location": "NYC",
+        "start": "2025-12-11T12:00:00Z",
+        "end": "2025-12-11T13:00:00Z"
+      }')
 
-if [ "$INVALID_STATUS" -lt 400 ] || [ "$INVALID_STATUS" -ge 500 ]; then
-  echo "❌ Expected a 4xx client error for invalid payload, got $INVALID_STATUS"
-  cat /tmp/write_invalid_resp.json
+if [[ "$INVALID_RESPONSE" == "400" ]]; then
+  echo "✅ Invalid event correctly rejected"
+else
+  echo "❌ Invalid event unexpectedly accepted (status $INVALID_RESPONSE)"
+  cat /tmp/invalid_event.json
   exit 1
 fi
-echo "✅ Invalid event correctly rejected (status $INVALID_STATUS)"
 
-echo "[3] Updating the created event (PUT /events/:id)..."
-UPDATE_JSON=$(jq '.name = "Updated Test Event"' /tmp/write_create_resp.json)
 
-UPDATE_STATUS=$(curl -s -o /tmp/write_update_resp.json -w "%{http_code}" \
-  -X PUT "$WRITE_BASE/events/$EVENT_ID" \
+############################################
+# 3. Update event — MUST send a full valid body
+############################################
+echo "[3] Updating event (PUT /events/$EVENT_ID)..."
+
+UPDATE_STATUS=$(curl -s -o /tmp/update_event.json -w "%{http_code}" \
+  -X PUT "$BASE_URL/events/$EVENT_ID" \
   -H "Content-Type: application/json" \
-  -d "$UPDATE_JSON")
+  -d "{
+        \"name\": \"Updated Event Title\",
+        \"description\": \"Updated description\",
+        \"location\": \"Boston\",
+        \"start\": \"2025-12-11T14:00:00Z\",
+        \"end\": \"2025-12-11T15:00:00Z\",
+        \"min_attendees\": 3,
+        \"max_attendees\": 20
+      }")
 
-if [ "$UPDATE_STATUS" -lt 200 ] || [ "$UPDATE_STATUS" -ge 300 ]; then
+if [[ "$UPDATE_STATUS" == "200" ]]; then
+  echo "✅ Event updated successfully"
+else
   echo "❌ Failed to update event (status $UPDATE_STATUS)"
-  cat /tmp/write_update_resp.json
+  cat /tmp/update_event.json
   exit 1
 fi
-echo "✅ Event updated (status $UPDATE_STATUS)"
 
-echo "[4] Deleting the event (DELETE /events/:id)..."
-DELETE_STATUS=$(curl -s -o /tmp/write_delete_resp.json -w "%{http_code}" \
-  -X DELETE "$WRITE_BASE/events/$EVENT_ID")
 
-if [ "$DELETE_STATUS" -lt 200 ] || [ "$DELETE_STATUS" -ge 300 ]; then
-  echo "❌ Failed to delete event (status $DELETE_STATUS)"
-  cat /tmp/write_delete_resp.json
-  exit 1
-fi
-echo "✅ Event deleted (status $DELETE_STATUS)"
+###########################################
+# 4. DELETE EVENT
+###########################################
+echo "[4] Deleting event (DELETE /events/$EVENT_ID)..."
 
-echo "=== Write Service tests PASSED ==="
+DELETE_STATUS=$(curl -s -o /dev/null \
+  -w "%{http_code}" \
+  -X DELETE "$BASE_URL/events/$EVENT_ID")
+
+case "$DELETE_STATUS" in
+  204|200)
+    echo "✅ Event deleted successfully (status $DELETE_STATUS)"
+    ;;
+  *)
+    echo "❌ Failed to delete event (status $DELETE_STATUS)"
+    exit 1
+    ;;
+esac
