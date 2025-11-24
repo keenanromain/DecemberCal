@@ -42,9 +42,11 @@ http://localhost:8080/
 
 5. <a href="#usage">Usage</a>
 
-6. <a href="#testing">Testing</a>
+6. <a href="#requirements">Requirements</a>
 
-7. <a href="#out-of-scope">Out of Scope</a>
+7. <a href="#testing">Testing</a>
+
+8. <a href="#out-of-scope">Out of Scope</a>
 
 ---
 ## Postgres
@@ -364,6 +366,61 @@ docker compose up -d --build
 ```bash
 curl -sfN http://localhost:4001/events/stream
 ```
+
+---
+
+## Requirements
+
+### To develop, run, or test the application locally, you will need the following tools installed:
+
+1. Docker Desktop (Required)
+
+The entire stack (Postgres → Write-service → Read-service → Frontend) runs in Docker containers.
+
+You must have:
+ - Docker Engine 24+
+ - Docker Compose v2+ (bundled with Docker Desktop)
+
+Download:
+https://www.docker.com/products/docker-desktop/
+
+Verify your install:
+```bash
+docker --version
+docker compose version
+```
+
+2. curl (Required for Test Suite)
+
+All service tests in the test suite use `curl` to hit API endpoints. The `curl` command is installed by default for macOS.
+
+Install for linux:
+```bash
+sudo apt install curl
+
+curl --version
+```
+
+3. jq (Required for Test Suite)
+
+The test suite uses `jq` to parse JSON responses.
+
+Install:
+```bash
+brew install jq       # macOS
+sudo apt install jq   # Ubuntu/Debian
+
+jq --version
+```
+
+4. Node.js (Optional. Only requireed for local frontend development)
+
+If you want to run the frontend locally, outside Docker:
+- Node.js v20+
+- npm v10+
+
+Download:
+https://nodejs.org/en/download 
 
 ---
 
