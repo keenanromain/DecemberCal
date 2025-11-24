@@ -42,7 +42,9 @@ http://localhost:8080/
 
 5. <a href="#usage">Usage</a>
 
-6. <a href="#out-of-scope">Out of Scope</a>
+6. <a href="#testing">Testing</a>
+
+7. <a href="#out-of-scope">Out of Scope</a>
 
 ---
 ## Postgres
@@ -331,6 +333,31 @@ docker compose up -d --build
 ```bash
 curl -sfN http://localhost:4001/events/stream
 ```
+
+---
+
+## Testing
+
+This project includes a shell-based test suite. The tests are lightweight (pure Bash + curl + jq) so they can be executed in any environment without requiring Node, Jest, or other test runners. They provide coverage for:
+
+- Write-service behavior
+
+- Read-service behavior
+
+- Method-blocking enforcement
+
+- Payload validation (Zod-backed)
+
+- SSE stability (/events/stream)
+
+### Test execution
+
+You can run all of the tests from inside the project root:
+```bash
+./test/run_all_tests.sh
+```
+
+All tests live in the `./test` directory.
 
 ---
 ## Out of Scope
