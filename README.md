@@ -40,7 +40,9 @@ http://localhost:8080/
 
 4. <a href="#frontend">Frontend</a>
 
-5. <a href="#out-of-scope">Out of Scope</a>
+5. <a href="#usage">Usage</a>
+
+6. <a href="#out-of-scope">Out of Scope</a>
 
 ---
 ## Postgres
@@ -62,7 +64,7 @@ Separating reads from writes was a design decision to ensure:
 The primary `events` table:
 <img width="1065" height="395" alt="Image" src="https://github.com/user-attachments/assets/8fd4a93d-13e1-45b5-939e-857e6ed4eb56" />
 
-The `events_read` is a read replica table that is updated via triggers as seen in the `events` schema above.
+The `events_read` is a read replica table that is updated via the `sync_events_to_read()` trigger as seen in the `events` schema above. The trigger guarantees eventual consistency between services. This approach prioritizes availability and partition tolerance from a CAP theorem perspective.
 
 ### Docker Configuration
 
@@ -92,6 +94,10 @@ volumes:
 ```
 
 Docker Compose confirms DB readiness via the `healtcheck` above. The other services only boot once the DB is accepting connections.
+
+### Indexing
+
+The existing `events_pkey` provides a fast lookup by UUID.
 
 ---
 
@@ -228,8 +234,15 @@ The service is a single-page application that renders the December 2025 month gr
 
 ### Endpoints
 
-1. Read service (SSE stream + REST GET endpoints)
-2. Write service (REST POST/PUT/DELETE endpoints) 
+On page load, the frontend:
+  - Performs a REST `GET` to `/events` on the **read-service**.
+  - Establishes an **SSE connection** to `/events/stream`.
+
+When a user creates/edits/deletes an event:
+  - The frontend calls the **write-service** (REST `POST/PUT/DELETE` to `/events`).
+  - The backend’s trigger (`sync_events_to_read`) keeps the read database in sync.
+  - The read service emits a `{ "type": "refresh" }` event on the SSE stream.
+  - The frontend listens for that SSE event and re-fetches `/events`, ensuring the UI is immediately up to date.
 
 The frontend exposes port 80.
 
@@ -277,13 +290,46 @@ Stream keeps the UI synchronized
     - **Read service** (e.g. `GET /events`, `GET /events/:id`, SSE `/events/stream`)
     - **Write service** (e.g. `POST/PUT/DELETE /events`)
 
-### Environment Variables
+### Build-Time Configuration
 
-`.env.production` bakes in the following env variables at build time:
+The frontend uses Vite’s `VITE_*` env variables, baked in build time. They live in `.env.production`:
 
 ```yaml
 VITE_READ_API=http://localhost:4001
 VITE_WRITE_API=http://localhost:4000
+```
+
+---
+## Usage
+
+The `./docker_refresh` script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. The bash code wraps around the following core commands:
+
+1. Cleans all containers, volumes, networks
+```bash
+docker compose down -v --remove-orphans
+docker system prune -f
+```
+
+2. Rebuilds everything from scratch
+```bash
+docker compose up -d --build
+```
+
+3. Waits for ports to become available
+
+    - Postgres:5432
+    
+    - write-service:4000
+
+    - read-service:4001
+
+    - frontend:8080
+
+4. Waits for backend `/healthz` endpoints to succeed
+
+5. Validates SSE readiness
+```bash
+curl -sfN http://localhost:4001/events/stream
 ```
 
 ---
@@ -317,4 +363,4 @@ This project is designed to showcase a simple event-driven microservice architec
 7. Use more beefy base images for Docker
 8. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
 9. Monitoring & Observability (Prometheus + Grafana and ELK)
-10. A more robust testing suite: end-to-end, performance benchmarking, load testing, etc.
+10. A more robust testing suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
