@@ -301,6 +301,37 @@ VITE_READ_API=http://localhost:4001
 VITE_WRITE_API=http://localhost:4000
 ```
 
+### Run-Time Configuration
+The frontend is served using Nginx for long-term asset caching, SPA routing through `try_files`, and high-performance static file serving.
+
+```conf
+server {
+    listen 80;
+    server_name localhost;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Allow SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Good caching defaults for static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        try_files $uri =404;
+        expires 30d;
+        access_log off;
+    }
+}
+```
+
+The frontend therefore can rely on a small and clean final image because of the two stage process:
+
+1. **Builder Stage**: Vite compiles the React app
+
+2. **Runtime Stage**: Nginx serves optimized static files
+
 ---
 ## Usage
 
