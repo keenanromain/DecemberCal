@@ -1,0 +1,33 @@
+# Docker
+*.pid
+*.pid.lock
+docker-compose.override.yml
+**/docker-entrypoint.d/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# Temp
+tmp/
+**/*.tmp.json
+
+# DB
+*.sql~
+*.swp
+
+# Docker volumes
+pgdata/
+postgres-data/
+
+# Logs
+*.log
+
+# Vite build directories across any service
+dist/
+
+# Editor
+.vscode/

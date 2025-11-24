@@ -1,0 +1,58 @@
+# Git metadata
+.git/
+.gitignore
+
+# macOS junk
+.DS_Store
+*.swp
+
+# Editor configs and temp files
+*.swp
+*.swo
+*.tmp
+*.log
+*.bak
+.vscode/
+
+# Docker junk in child services
+**/.dockerignore
+**/Dockerfile
+
+# Tests
+tests/
+
+# Go build artifacts
+bin/
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+coverage.out
+go.sum
+
+# Go development files
+*.log
+*.tmp
+*.tar.gz
+*.zip
+*.swp
+*.swo
+
+# Frontend build cache
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+
+# Prisma migration engine downloads
+write-service-ts/prisma/migrations/.DS_Store
+write-service-ts/prisma/migrations/*/.DS_Store
+
+# Prisma artifacts generated on host
+write-service-ts/prisma/migrations/**/README.md
+write-service-ts/prisma/*.sqlite
+
+# Misc
+*.zip

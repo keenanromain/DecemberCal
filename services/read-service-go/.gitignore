@@ -1,0 +1,38 @@
+# Binaries
+read-service
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go build artifacts
+*.out
+*.test
+
+# Go module bins (if using GOBIN or go install)
+bin/
+cmd/**/bin/
+
+# Local environment files
+.env
+*.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+
+# Temp files, cache, etc.
+.tmp/
+temp/
+tmp/
+.cache/
