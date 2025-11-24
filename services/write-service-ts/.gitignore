@@ -1,0 +1,29 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+prisma/migrations/*.tmp
+*.sqlite
+*.db
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+
+# Build output
+dist/
+coverage/
+tmp/
+*.tmp.json
+
+# Docker
+docker-compose.override.yml
+docker-entrypoint-initdb.d/*

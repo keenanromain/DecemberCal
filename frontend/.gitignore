@@ -1,0 +1,34 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite build output
+dist/
+*.local
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+**/docker-entrypoint.d/
+
+# Tests
+coverage/
+tmp/
+*.tmp.json
+
+# Build artifacts
+*.cache/
+vite.config.timestamp*
