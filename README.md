@@ -377,9 +377,9 @@ This project includes a shell-based test suite. The tests are lightweight (pure 
 
 - Method-blocking enforcement
 
-- Payload validation (Zod-backed)
+- Payload validation (Zod-enforced rules)
 
-- SSE stability (/events/stream)
+- SSE stability (`/events/stream`)
 
 ### Test execution
 
@@ -421,4 +421,4 @@ This project is designed to showcase a simple event-driven microservice architec
 7. Use more beefy base images for Docker
 8. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
 9. Monitoring & Observability (Prometheus + Grafana and ELK)
-10. A more robust testing suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
+10. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
