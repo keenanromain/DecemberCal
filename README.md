@@ -50,12 +50,14 @@ Note: All containers ensure that Docker builds and runs for ARM64 architecture t
 3. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
 
 4. <a href="#frontend">Frontend</a>
+
+5. <a href="#out-of-scope">Out of Scope</a>
 ---
 ## Postgres
 
 ### Overview
 
-The database architecture follows a *Command Query Responsibility Segregation (CQRS)* pattern where:
+The **postgres** architecture follows a *Command Query Responsibility Segregation (CQRS)* pattern where:
 
 - **write-service** (TypeScript) performs all `INSERT`, `UPDATE`, and `DELETE` operations.
 - **read-service** (Go) reads data and exposes a high-performance, read-optimized SSE stream.
@@ -147,7 +149,7 @@ A custom hub that ensures safe concurrent writes via channels, auto-reconnects, 
 
 Connections are pooled and reused for efficiency.
 
-4. CORS Configuration
+### Cross-Origin Resource Sharing (CORS) Configuration
 
 ```yaml
 Origin: *
@@ -163,7 +165,6 @@ The service remains secure because the service is read-only.
 Returns the following when healthy
 
 `{ "status": "ok", "service": "read-service" }`
-
 
 ---
 ## Write-Service (TypeScript)
@@ -189,6 +190,20 @@ Express serves as the HTTP server layer for the write-service:
 
 Because of strict method enforcement, **all** routes except `/healthz` reject GET requests.
 
+### Architecture
+
+1. Express HTTP Layer
+
+Provides a lightweight and flexible API.
+
+2. Prisma ORM (Write Model)
+
+The service can interact with Postgres in a type-safe, schema-driven way.
+
+3. Database access
+
+All writes are persisted into the canonical `events` table.
+
 ### Validation
 
 Payloads are validated using Zod:
@@ -200,7 +215,6 @@ Payloads are validated using Zod:
 - End time must be after start
 
 This ensures that all malformed requests are rejected early.
-
 
 ### Database Migrations
 
@@ -215,140 +229,82 @@ Returns the following when healthy
 `{ "status": "ok", "service": "write-service" }`
 
 ---
+
 ## Frontend
-This frontend service is a modern, production-ready single-page application built with React, Vite, and Chakra UI, packaged for deployment via Docker and served in production by NGINX. The application renders a December-based calendar UI, displays events streamed from backend services, and provides interfaces for creating, editing, and deleting events with real-time updates.
 
-The architecture emphasizes simplicity, performance, modularity, and cloud-deployability, making it suitable both for local development and for future hosting in a containerized cloud environment.
+The **frontend** service renders a December-based calendar UI, displays events streamed from backend services, and provides interfaces for creating, editing, and deleting events all with real-time updates.
 
-🚀 Technology Stack
-Framework
 
-React (with functional components & hooks)
+### Overview
 
-Chakra UI (component library with theming & accessibility built-in)
+The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. It depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
 
-Build Tooling
+### Endpoints
 
-Vite
+1. Read service (SSE stream + REST GET endpoints)
+2. Write service (REST POST/PUT/DELETE endpoints) 
 
-Lightning-fast development server
+The frontend exposes port 80.
 
-Modern ES module output
+### Architecture
 
-Optimized production builds
+1. React
 
-.env.production support for build-time API injection. The environment variables used for this project are:
-```
+Renders the user interface and manages application state
+
+2. Vite
+
+Local development server
+
+3. Chakra UI
+
+Component library for themes
+
+4. Nginx
+
+Serves the build output / static assets
+
+5. SSE
+
+Stream keeps the UI synchronized
+
+### Environment Variables
+
+`.env.production` support for build-time API injection. The env variables are:
+
+```yaml
 VITE_READ_API=http://localhost:4001
 VITE_WRITE_API=http://localhost:4000
 ```
 
-Runtime
+---
+## Out of Scope
 
-NGINX (static file server for production)
-
-SPA-optimized configuration
-
-Gzip compression
-
-Asset caching and immutable cache rules
-
-Clean routing via try_files
-
-Containerization
-
-Docker multi-stage build
-
-Stage 1: Node 20 Alpine for Vite build
-
-Stage 2: NGINX Alpine serving the /dist bundle
-
-Smaller, secure, production-ready images
-
-APIs
-
-Read service (SSE stream + REST GET endpoints)
-
-Write service (REST POST/PUT/DELETE endpoints)
-
-
-Key Components
-
-Calendar.jsx
-Renders the December 2025 month grid, displays events, and opens modals on click.
-
-EventModal.jsx
-The unified modal for creating and editing events, with front-end validation that matches backend Zod schemas.
-
-SSE Integration
-A Server-Sent Events stream keeps the UI synchronized with backend event updates without polling.
-
-Data Flow
-
-Frontend loads → fetches events from read-service
-
-User clicks a date or event → opens EventModal
-
-Modal validates & submits payload → sent to write-service
-
-write-service notifies read-service → emits SSE refresh
-
-Frontend receives SSE update → reloads event list
-(Achieves near real-time consistency)
-
-Key Technical Merits
-⭐ 1. Clean, Reactive UI with Modular Components
-
-Calendar rendering is deterministic.
-
-Event modal is unified across create/edit flows.
-
-All components share consistent styles via Chakra UI.
-
-⭐ 2. Strong Validation
-
-The modal enforces:
-
-Required: name, description, and one of location | online_link
-
-Proper date/time consistency: end > start
-
-Numeric sanity checks (e.g., attendees)
-
-This matches backend Zod validation for consistent shared rules.
-
-⭐ 3. Real-Time Updates via SSE
-
-State synchronization is fast and efficient.
-
-No polling required.
-
-Browser-native EventSource keeps implementation simple.
-
-⭐ 4. Cloud-Friendly Containerization
-
-NGINX serves compiled static assets.
-
-Node.js is not shipped in production.
-
-Multi-stage builds keep image <50MB.
-
-Healthchecks ensure correct orchestration behavior.
-
-⭐ 5. Fully Declarative Configuration
-
-.env.production enables clean separation of runtime vs build-time settings.
-
-Vite only bundles necessary API URLs.
-
-Docker and NGINX configs are minimal, clear, and reproducible.
-
-Healthcheck Behavior
-
-The frontend container uses a curl -sf http://localhost/ healthcheck, confirming:
-
-NGINX is serving static files
-
-The container is operational
-
-The SPA fallback routing works
+1. Search functionality for events (i.e. `GET /search?q={searchQuery}` on a database like ElasticSearch)
+2. Authentication & Authorization (i.e. login required for `POST`, `PUT`, and `DELETE`)
+3. Drag-and-drop events on the UI
+4. Hosting in AWS (services likely required: ECR, ECS, RDS, ALB / API Gateway, SSM Parameter Store, CloudWatch, VPC, and Route 53)
+```
+        +-----------------+
+        | Client frontend |
+        +--------+--------+ 
+                 |
+          +-------------+
+          | API Gateway |
+          +------+------+ 
+                 |
+        +--------+--------+
+        |                 |
+ ECS TypeScript         ECS Go
+ write-service          read-service
+        |                 |
+        +--------+--------+
+                 |
+            RDS Postgres
+```
+5. GitHub Actions for CI/CD into the cloud
+6. Infrastructure as Code (Terraform or CloudFormation if in AWS)
+7. Use more beefy base images for Docker
+8. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
+9. Monitoring & Observability (Prometheus + Grafana and ELK)
+10. Full testing suite: end-to-end, performance benchmarking, load testing, etc.
