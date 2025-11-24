@@ -9,7 +9,7 @@ The project was developed using a microservice architecture composed of four ind
 3. **Write-Service (TypeScript)** – the backend service responsible for data writes, updates, and deletes
 4. **Frontend** – a lightweight UI that interacts with the read/write services
 
-Each service is orchestrated through a single `docker-compose.yml` file found in the root of the respository.
+Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
 
 At a high level, the system also includes Read Replication, Server Send Events (SSE), Database Migrations, `/healthcheckz` endpoints for container orchestration, and NGINX for future hosting in a containerized cloud environment.
 
@@ -62,10 +62,7 @@ Separating reads from writes was a design decision to ensure:
 The primary `events` table:
 <img width="1065" height="395" alt="Image" src="https://github.com/user-attachments/assets/8fd4a93d-13e1-45b5-939e-857e6ed4eb56" />
 
-The `events_read` is a read replica table that is updated via triggers:
-<img width="372" height="62" alt="Image" src="https://github.com/user-attachments/assets/8be66e39-d821-4c4d-8724-d9b6f9a428d1" />
-
-as seen in `services/write-service-ts/prisma/migrations/20250102_events_read_replica/migration.sql`.
+The `events_read` is a read replica table that is updated via triggers as seen in the `events` schema above.
 
 ### Docker Configuration
 
@@ -244,13 +241,16 @@ Renders the user interface and manages application state
 
 2. Vite
 
-Local development server
+For bundling and local development
 
 3. Chakra UI
 
-Component library for themes
+Component library for layout, themes, responsive design
 
-4. Nginx
+4. Axios
+Fetch-style API clients (via `src/api/events.js`)
+
+5. Nginx
 
 Serves the build output / static assets
 
@@ -258,9 +258,28 @@ Serves the build output / static assets
 
 Stream keeps the UI synchronized
 
+### Components
+
+- **`Calendar.jsx`**
+  - Renders the month grid for December 2025.
+  - Groups events by date and shows badges within each day cell.
+  - Clicking a day opens an **event creation modal**.
+  - Clicking an event badge opens an **event editing modal**.
+
+- **`EventModal.jsx`**
+  - Handles both *create* and *edit* flows.
+  - Validates required fields before submitting.
+  - Talks to the write API (`POST/PUT/DELETE /events`).
+
+- **`api/events.js`**
+  - Centralizes API configuration and endpoints for both read and write services.
+  - Uses separate base URLs for:
+    - **Read service** (e.g. `GET /events`, `GET /events/:id`, SSE `/events/stream`)
+    - **Write service** (e.g. `POST/PUT/DELETE /events`)
+
 ### Environment Variables
 
-`.env.production` support for build-time API injection. The env variables are:
+`.env.production` bakes in the following env variables at build time:
 
 ```yaml
 VITE_READ_API=http://localhost:4001
@@ -298,4 +317,4 @@ This project is designed to showcase a simple event-driven microservice architec
 7. Use more beefy base images for Docker
 8. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
 9. Monitoring & Observability (Prometheus + Grafana and ELK)
-10. Full testing suite: end-to-end, performance benchmarking, load testing, etc.
+10. A more robust testing suite: end-to-end, performance benchmarking, load testing, etc.
