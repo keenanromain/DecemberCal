@@ -234,7 +234,7 @@ The **frontend** service renders a December-based calendar UI, displays events s
 
 ### Overview
 
-The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. It depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
+The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. The frontend has working drag-and-drop capabilities. Any drag-drop PUT request retains all fields exactly as stored in DB. The frontend depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
 
 ### Endpoints
 
@@ -265,9 +265,10 @@ For bundling and local development
 Component library for layout, themes, responsive design
 
 4. Axios
+
 Fetch-style API clients (via `src/api/events.js`)
 
-5. Nginx
+6. Nginx
 
 Serves the build output / static assets
 
