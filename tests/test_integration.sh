@@ -4,7 +4,13 @@ set -euo pipefail
 WRITE_BASE="${WRITE_BASE:-http://localhost:4000}"
 READ_BASE="${READ_BASE:-http://localhost:4001}"
 
-echo "=== Integration Tests (Write → DB Trigger → Read) ==="
+# Colors
+GREEN="\\033[32m"
+RED="\\033[31m"
+YELLOW="\\033[33m"
+RESET="\\033[0m"
+
+echo -e "${YELLOW}=== Integration Tests (Write → DB Trigger → Read) ===${RESET}"
 echo "WRITE_BASE=$WRITE_BASE"
 echo "READ_BASE=$READ_BASE"
 echo ""
@@ -180,4 +186,4 @@ else
 fi
 
 echo ""
-echo "🎉 ALL INTEGRATION TESTS PASSED!"
+echo -e "${GREEN}🎉 ALL INTEGRATION TESTS PASSED!${RESET}"
