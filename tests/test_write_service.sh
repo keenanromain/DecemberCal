@@ -5,20 +5,17 @@ BASE_URL="http://localhost:4000"
 
 # Colors
 GREEN="\\033[32m"
+BLUE="\033[0;34m"
 RED="\\033[31m"
 YELLOW="\\033[33m"
 RESET="\\033[0m"
 
 # Pretty Headers
-section() {
-  echo -e "\n$1"
-}
-
-# Status Helpers
+section() { echo -e "\n${YELLOW}$1${RESET}"; }
 ok()   { echo -e "${GREEN}✅${RESET} $1"; }
 fail() { echo -e "${RED}❌$1${RESET}"; exit 1; }
 
-echo -e "${YELLOW}=== Testing Write Service at $BASE_URL ===${RESET}"
+echo -e "${BLUE}=== Testing Write Service at $BASE_URL ===${RESET}"
 
 ################################################################################
 # 1. CREATE VALID EVENT
