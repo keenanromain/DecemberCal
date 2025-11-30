@@ -460,8 +460,7 @@ This project is designed to showcase a simple event-driven microservice architec
 
 1. Search functionality for events (i.e. `GET /search?q={searchQuery}` on a database like ElasticSearch)
 2. Authentication & Authorization (i.e. login required for `POST`, `PUT`, and `DELETE`)
-3. Drag-and-drop functionality for existing events on the UI
-4. Hosting in AWS (services likely required: ECR, ECS, RDS, ALB / API Gateway, SSM Parameter Store, CloudWatch, VPC, and Route 53)
+3. Hosting in AWS (services likely required: ECR, ECS, RDS, ALB / API Gateway, SSM Parameter Store, CloudWatch, VPC, and Route 53)
 ```
         +-----------------+
         | Client frontend |
@@ -480,9 +479,9 @@ This project is designed to showcase a simple event-driven microservice architec
                  |
             RDS Postgres
 ```
-5. GitHub Actions for CI/CD into the cloud
-6. Infrastructure as Code (Terraform or CloudFormation if in AWS)
-7. Use more beefy base images for Docker
-8. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
-9. Monitoring & Observability (Prometheus + Grafana and ELK)
-10. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
+4. GitHub Actions for CI/CD into the cloud
+5. Infrastructure as Code (Terraform or CloudFormation if in AWS)
+6. Use more beefy base images for Docker
+7. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
+8. Monitoring & Observability (Prometheus + Grafana and ELK)
+9. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
