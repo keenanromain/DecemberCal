@@ -1,5 +1,5 @@
 // src/components/Calendar.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   Box,
   Grid,
@@ -9,11 +9,13 @@ import {
   VStack,
   Badge,
   useColorModeValue,
+  useToast,
 } from "@chakra-ui/react";
+
 import EventModal from "./EventModal";
 import eventsApi from "../api/events";
 
-const { readClient } = eventsApi;
+const { readClient, updateEvent } = eventsApi;
 
 const DECEMBER_YEAR = 2025;
 const DECEMBER_MONTH_INDEX = 11; // December
@@ -22,18 +24,26 @@ function buildDecemberGrid() {
   const days = [];
   const firstOfMonth = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX, 1);
   const lastOfMonth = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX + 1, 0);
+
   const daysInMonth = lastOfMonth.getDate();
   const firstWeekday = firstOfMonth.getDay();
 
   for (let i = 0; i < firstWeekday; i++) days.push(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
+
   return days;
 }
 
 export default function Calendar() {
+  const toast = useToast();
+
   const [events, setEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  // Drag state
+  const dragInfoRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const bgDay = useColorModeValue("white", "gray.800");
   const bgHover = useColorModeValue("blue.50", "blue.900");
@@ -47,7 +57,7 @@ export default function Calendar() {
       const res = await readClient.get("/events");
       setEvents(res.data);
     } catch (err) {
-      console.error("[Calendar] failed to load events:", err);
+      console.error("[Calendar] load error:", err);
     }
   };
 
@@ -55,9 +65,9 @@ export default function Calendar() {
     loadEvents();
     const source = new EventSource("http://localhost:4001/events/stream");
 
-    source.addEventListener("connected", (evt) =>
-      console.log("[SSE] connected:", evt.data)
-    );
+    source.addEventListener("connected", (evt) => {
+      console.log("[SSE] connected:", evt.data);
+    });
 
     source.addEventListener("update", (evt) => {
       try {
@@ -73,11 +83,12 @@ export default function Calendar() {
     return () => source.close();
   }, []);
 
+  // Build mapping of date → events
   const eventsByDate = useMemo(() => {
     const map = {};
     for (const ev of events) {
-      if (!ev.start) continue;
-      const key = ev.start.split("T")[0];
+      const key = ev.start?.split("T")[0];
+      if (!key) continue;
       if (!map[key]) map[key] = [];
       map[key].push(ev);
     }
@@ -92,9 +103,167 @@ export default function Calendar() {
   };
 
   const handleEventClick = (ev, e) => {
+    if (isDragging) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     e.stopPropagation();
     setSelectedDate(null);
     setSelectedEvent(ev);
+  };
+
+  /**
+   * Move datetime to a new local calendar day (preserves time-of-day).
+   */
+  const moveDateToNewDay = (originalISO, targetDay) => {
+    const original = new Date(originalISO);
+    return new Date(
+      targetDay.getFullYear(),
+      targetDay.getMonth(),
+      targetDay.getDate(),
+      original.getHours(),
+      original.getMinutes(),
+      original.getSeconds(),
+      original.getMilliseconds()
+    ).toISOString();
+  };
+
+  /** Drag start */
+  const handleEventDragStart = (ev) => (e) => {
+    dragInfoRef.current = {
+      eventId: ev.id,
+      originalStart: ev.start,
+      originalEnd: ev.end,
+    };
+
+    setIsDragging(true);
+
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", ev.id);
+  };
+
+  /** Drag end */
+  const handleEventDragEnd = () => {
+    dragInfoRef.current = null;
+    setIsDragging(false);
+  };
+
+  /** Allow drop */
+  const handleDayDragOver = (e) => {
+    if (!dragInfoRef.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  /**
+   * CLEAN PAYLOAD BUILDER
+   * Ensures:
+   *  - No nulls
+   *  - Only valid optional fields included
+   *  - One of location or online_link MUST exist
+   */
+  const buildCleanPayload = (ev, newStart, newEnd) => {
+    const payload = {
+      name: ev.name,
+      description: ev.description,
+      start: newStart,
+      end: newEnd,
+    };
+
+    // Optional string fields (include only if non-empty)
+    const stringFields = [
+      ["location", ev.location],
+      ["online_link", ev.online_link],
+      ["location_notes", ev.location_notes],
+      ["preparation_notes", ev.preparation_notes],
+    ];
+
+    for (const [key, value] of stringFields) {
+      if (typeof value === "string" && value.trim().length > 0) {
+        payload[key] = value;
+      }
+    }
+
+    // Optional numeric fields
+    if (typeof ev.min_attendees === "number") {
+      payload.min_attendees = ev.min_attendees;
+    }
+    if (typeof ev.max_attendees === "number") {
+      payload.max_attendees = ev.max_attendees;
+    }
+
+    // Validate: must have either location or online_link
+    const hasLocation = !!payload.location;
+    const hasOnline = !!payload.online_link;
+
+    if (!hasLocation && !hasOnline) {
+      console.error("INVALID PAYLOAD:", payload);
+      throw new Error(
+        "Event must have either a location or an online link before drag/drop update."
+      );
+    }
+
+    return payload;
+  };
+
+  /** Drop handler */
+  const handleDropOnDay = (day) => async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const dragInfo = dragInfoRef.current;
+    if (!dragInfo) return;
+
+    const { eventId, originalStart, originalEnd } = dragInfo;
+
+    const ev = events.find((x) => x.id === eventId);
+    if (!ev) {
+      console.error("[Calendar] drag-drop event not found");
+      dragInfoRef.current = null;
+      setIsDragging(false);
+      return;
+    }
+
+    const targetDate = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX, day);
+
+    const originalDate = originalStart.split("T")[0];
+    const targetKey = `2025-12-${String(day).padStart(2, "0")}`;
+
+    if (originalDate === targetKey) {
+      dragInfoRef.current = null;
+      setIsDragging(false);
+      return;
+    }
+
+    const newStart = moveDateToNewDay(originalStart, targetDate);
+    const newEnd = moveDateToNewDay(originalEnd, targetDate);
+
+    try {
+      const payload = buildCleanPayload(ev, newStart, newEnd);
+
+      await updateEvent(eventId, payload);
+
+      // Optimistic update
+      setEvents((prev) =>
+        prev.map((x) =>
+          x.id === eventId ? { ...x, start: newStart, end: newEnd } : x
+        )
+      );
+    } catch (err) {
+      console.error("[Calendar] failed to move event:", err);
+
+      toast({
+        title: "Failed to move event",
+        description: err.message ?? "Check required fields.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      dragInfoRef.current = null;
+      setIsDragging(false);
+    }
   };
 
   return (
@@ -114,6 +283,7 @@ export default function Calendar() {
             <Heading size="lg">December 2025</Heading>
             <Text color="gray.500">
               Click a date to create an event. Click an event to edit or delete.
+              Drag an event to move it.
             </Text>
           </VStack>
 
@@ -126,9 +296,9 @@ export default function Calendar() {
             borderBottomWidth="1px"
             borderColor={borderColor}
           >
-            {weekdayLabels.map((label) => (
-              <Box key={label} py={2}>
-                {label}
+            {weekdayLabels.map((lab) => (
+              <Box key={lab} py={2}>
+                {lab}
               </Box>
             ))}
           </Grid>
@@ -154,6 +324,8 @@ export default function Calendar() {
                     transition="all 0.15s"
                     _hover={{ bg: bgHover, transform: "translateY(-2px)" }}
                     onClick={() => handleDayClick(day)}
+                    onDragOver={handleDayDragOver}
+                    onDrop={handleDropOnDay(day)}
                   >
                     <Text fontWeight="bold" fontSize="lg">
                       {day}
@@ -173,8 +345,11 @@ export default function Calendar() {
                             rounded="md"
                             fontSize="0.65rem"
                             colorScheme="blue"
-                            cursor="pointer"
+                            cursor="grab"
+                            draggable
                             _hover={{ opacity: 0.8 }}
+                            onDragStart={handleEventDragStart(ev)}
+                            onDragEnd={handleEventDragEnd}
                             onClick={(e) => handleEventClick(ev, e)}
                           >
                             {ev.name}
