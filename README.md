@@ -490,4 +490,4 @@ This project is designed to showcase a simple event-driven microservice architec
 7. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
 8. Monitoring & Observability (Prometheus + Grafana and ELK)
 9. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
-10. Add argument flags for the startup `./refresh_docker` script (i.e. `--verbose` to print all Docker output `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
+10. Add argument flags for the startup `./refresh_docker` script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
