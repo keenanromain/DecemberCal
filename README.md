@@ -338,7 +338,9 @@ The frontend therefore can rely on a small and clean final image because of the 
 ---
 ## Usage
 
-The `./docker_refresh` script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. The bash code wraps around the following core commands:
+The `./docker_refresh` script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. If Docker is turned off, the refresh script turns it on. 
+
+The bash code wraps around the following core commands:
 
 1. Cleans all containers, volumes, networks
 ```bash
@@ -367,6 +369,8 @@ docker compose up -d --build
 ```bash
 curl -sfN http://localhost:4001/events/stream
 ```
+
+6. Opens http://localhost:8080 on the browser
 
 ---
 
