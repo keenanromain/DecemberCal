@@ -18,7 +18,7 @@ section() {
 ok()   { echo -e "${GREEN}✅${RESET} $1"; }
 fail() { echo -e "${RED}❌$1${RESET}"; exit 1; }
 
-echo "=== Testing Write Service at $BASE_URL ==="
+echo -e "${YELLOW}=== Testing Write Service at $BASE_URL ===${RESET}"
 
 ################################################################################
 # 1. CREATE VALID EVENT

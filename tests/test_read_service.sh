@@ -2,7 +2,14 @@
 set -euo pipefail
 
 BASE="http://localhost:4001"
-echo "=== Testing Read Service at $BASE ==="
+
+# Colors
+GREEN="\\033[32m"
+RED="\\033[31m"
+YELLOW="\\033[33m"
+RESET="\\033[0m"
+
+echo -e "${YELLOW}=== Testing Read Service at $BASE ===${RESET}"
 
 ########################################
 # Helper: pretty check
@@ -85,4 +92,4 @@ DEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
 require_status 204 "$DEL_STATUS" "Deleted test event"
 
 echo ""
-echo "🎉 Read-service tests complete and ALL PASSED!"
+echo -e "${GREEN}🎉 All Read-Service Tests Passed!${RESET}"
