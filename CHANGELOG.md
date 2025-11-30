@@ -4,4 +4,4 @@
 
 Features:
 
-- Include support for drag-and-drop updates ()
+- Include support for drag-and-drop updates (f33232a675dd433728da41d3c2d07bb177afab03)
