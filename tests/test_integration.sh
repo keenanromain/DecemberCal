@@ -6,11 +6,17 @@ READ_BASE="${READ_BASE:-http://localhost:4001}"
 
 # Colors
 GREEN="\\033[32m"
+BLUE="\033[0;34m"
 RED="\\033[31m"
 YELLOW="\\033[33m"
 RESET="\\033[0m"
 
-echo -e "${YELLOW}=== Integration Tests (Write → DB Trigger → Read) ===${RESET}"
+# Pretty Headers
+section() {
+  echo -e "\n${YELLOW}$1${RESET}"
+}
+
+echo -e "${BLUE}=== Integration Tests (Write → DB Trigger → Read) ===${RESET}"
 echo "WRITE_BASE=$WRITE_BASE"
 echo "READ_BASE=$READ_BASE"
 echo ""
@@ -36,7 +42,7 @@ require_status() {
 ########################################
 # 1. CREATE EVENT
 ########################################
-echo "[1] Creating event via WRITE service (POST /events)..."
+section "[1] Creating event via WRITE service (POST /events)..."
 
 INT_EVENT_JSON='{
   "name": "Integration Test Event",
@@ -67,7 +73,7 @@ echo ""
 ########################################
 # 2. READ EVENT (EVENTUAL CONSISTENCY POLL)
 ########################################
-echo "[2] Checking READ service propagation..."
+section "[2] Checking READ service propagation..."
 
 MAX_ATTEMPTS=10
 SLEEP_SECONDS=1
@@ -98,7 +104,7 @@ echo ""
 ########################################
 # 3. UPDATE EVENT
 ########################################
-echo "[3] Updating event via WRITE service (PUT /events/$INT_EVENT_ID)..."
+section "[3] Updating event via WRITE service (PUT /events/$INT_EVENT_ID)..."
 
 UPDATE_JSON=$(jq '{
   name: "Integration Test Event (Updated)",
@@ -121,7 +127,7 @@ echo ""
 ########################################
 # 4. READ UPDATED EVENT
 ########################################
-echo "[4] Verifying updated name propagates to READ service..."
+section "[4] Verifying updated name propagates to READ service..."
 
 FOUND_UPDATED=0
 for i in $(seq 1 $MAX_ATTEMPTS); do
@@ -151,7 +157,7 @@ echo ""
 ########################################
 # 5. DELETE EVENT
 ########################################
-echo "[5] Deleting event via WRITE service (DELETE /events/$INT_EVENT_ID)..."
+section "[5] Deleting event via WRITE service (DELETE /events/$INT_EVENT_ID)..."
 
 DELETE_STATUS=$(curl -s -o /tmp/int_delete_resp.json -w "%{http_code}" \
   -X DELETE "$WRITE_BASE/events/$INT_EVENT_ID")
@@ -162,7 +168,7 @@ echo ""
 ########################################
 # 6. READ-SERVICE MUST NO LONGER RETURN EVENT
 ########################################
-echo "[6] Verifying READ service no longer returns deleted event..."
+section "[6] Verifying READ service no longer returns deleted event..."
 
 STATUS_AFTER_DELETE=$(curl -s -o /tmp/int_read_after_delete.json -w "%{http_code}" \
   "$READ_BASE/events/$INT_EVENT_ID") || STATUS_AFTER_DELETE=$?
@@ -177,7 +183,7 @@ echo ""
 ########################################
 # 7. SSE TEST W/ LONGER TIMEOUT
 ########################################
-echo "[7] Checking SSE stream (GET /events/stream)..."
+section "[7] Checking SSE stream (GET /events/stream)..."
 
 if curl -sfN --max-time 3 "$READ_BASE/events/stream" >/dev/null 2>&1; then
   echo "✅ SSE endpoint reachable"

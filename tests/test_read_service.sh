@@ -5,11 +5,17 @@ BASE="http://localhost:4001"
 
 # Colors
 GREEN="\\033[32m"
+BLUE="\033[0;34m"
 RED="\\033[31m"
 YELLOW="\\033[33m"
 RESET="\\033[0m"
 
-echo -e "${YELLOW}=== Testing Read Service at $BASE ===${RESET}"
+# Pretty Headers
+section() {
+  echo -e "\n${YELLOW}$1${RESET}"
+}
+
+echo -e "${BLUE}=== Testing Read Service at $BASE ===${RESET}"
 
 ########################################
 # Helper: pretty check
@@ -30,7 +36,7 @@ require_status() {
 ########################################
 # 1. GET /events
 ########################################
-echo "[1] Fetching all events (GET /events)..."
+section "[1] Fetching all events (GET /events)..."
 STATUS=$(curl -s -o /tmp/read_all.json -w "%{http_code}" "$BASE/events")
 require_status 200 "$STATUS" "Fetched events list"
 COUNT=$(jq length /tmp/read_all.json 2>/dev/null || echo 0)
@@ -39,7 +45,7 @@ echo "   -> Returned $COUNT events"
 ########################################
 # 2. Create a test event via write-service
 ########################################
-echo "[2] Creating a test event for lookup..."
+section "[2] Creating a test event for lookup..."
 CREATE_STATUS=$(curl -s -o /tmp/read_created.json -w "%{http_code}" \
   -X POST http://localhost:4000/events \
   -H "Content-Type: application/json" \
@@ -59,7 +65,7 @@ echo "   -> Event ID: $EVENT_ID"
 ########################################
 # 3. GET /events/:id (valid)
 ########################################
-echo "[3] Fetching created event (GET /events/$EVENT_ID)..."
+section "[3] Fetching created event (GET /events/$EVENT_ID)..."
 STATUS=$(curl -s -o /tmp/read_one.json -w "%{http_code}" "$BASE/events/$EVENT_ID")
 require_status 200 "$STATUS" "Fetched event by ID"
 NAME=$(jq -r '.name' /tmp/read_one.json)
@@ -68,14 +74,14 @@ echo "   -> Event name: $NAME"
 ########################################
 # 4. GET /events/:id (invalid)
 ########################################
-echo "[4] Fetching non-existent event (GET /events/bad-id)..."
+section "[4] Fetching non-existent event (GET /events/bad-id)..."
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/events/bad-id")
 require_status 404 "$STATUS" "Correctly handled non-existent ID"
 
 ########################################
 # 5. SSE /events/stream
 ########################################
-echo "[5] Checking SSE stream stability (GET /events/stream)..."
+section "[5] Checking SSE stream stability (GET /events/stream)..."
 # We only test whether it *connects*. curl returns 0 quickly because SSE is infinite.
 curl -sfN --max-time 3 "$BASE/events/stream" >/tmp/read_sse.out 2>/dev/null \
   && echo "✅ SSE stream reachable" \
@@ -84,7 +90,7 @@ curl -sfN --max-time 3 "$BASE/events/stream" >/tmp/read_sse.out 2>/dev/null \
 ########################################
 # Cleanup: delete the event through write-service
 ########################################
-echo "[6] Cleaning up test event (DELETE /events/$EVENT_ID)..."
+section "[6] Cleaning up test event (DELETE /events/$EVENT_ID)..."
 DEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
   -X DELETE "http://localhost:4000/events/$EVENT_ID")
 
