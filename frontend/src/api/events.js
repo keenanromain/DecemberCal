@@ -1,40 +1,54 @@
 // src/api/events.js
+
 import axios from "axios";
 
-export const READ_API =
-  import.meta.env.VITE_READ_API || "http://localhost:4001";
+const READ_URL = "http://localhost:4001";
+const WRITE_URL = "http://localhost:4000";
 
-export const WRITE_API =
-  import.meta.env.VITE_WRITE_API || "http://localhost:4000";
+//
+// ---------- READ SERVICE ----------
+//
 
-export const readClient = axios.create({ baseURL: READ_API });
-export const writeClient = axios.create({ baseURL: WRITE_API });
-
+/** GET /events → returns array */
 export async function fetchEvents() {
-  const res = await readClient.get("/events");
+  const res = await axios.get(`${READ_URL}/events`);
   return res.data;
 }
 
-export async function createEvent(payload) {
-  const res = await writeClient.post("/events", payload);
+/** GET /events/:id → returns single event */
+export async function fetchEvent(id) {
+  const res = await axios.get(`${READ_URL}/events/${id}`);
   return res.data;
 }
 
+//
+// ---------- WRITE SERVICE ----------
+//
+
+/** PUT /events/:id → updates event */
 export async function updateEvent(id, payload) {
-  const res = await writeClient.put(`/events/${id}`, payload);
+  const res = await axios.put(`${WRITE_URL}/events/${id}`, payload);
   return res.data;
 }
 
+/** POST /events → create event */
+export async function createEvent(payload) {
+  const res = await axios.post(`${WRITE_URL}/events`, payload);
+  return res.data;
+}
+
+/** DELETE /events/:id */
 export async function deleteEvent(id) {
-  const res = await writeClient.delete(`/events/${id}`);
-  return res.data;
+  await axios.delete(`${WRITE_URL}/events/${id}`);
 }
 
+//
+// ---------- EXPORT API OBJECT ----------
+//
 export default {
-  readClient,
-  writeClient,
   fetchEvents,
-  createEvent,
+  fetchEvent,
   updateEvent,
+  createEvent,
   deleteEvent,
 };

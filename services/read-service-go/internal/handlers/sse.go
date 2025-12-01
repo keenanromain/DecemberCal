@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -19,23 +20,33 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
+	// Immediately open the stream
+	fmt.Fprintf(w, ": connected\n\n")
+	flusher.Flush()
 
-	// Initial event
+	// Tell frontend to run initial load
 	fmt.Fprintf(w, "event: connected\ndata: \"ok\"\n\n")
 	flusher.Flush()
 
-	// Heartbeat ticker
+	// Heartbeat
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
+	// Listen to global change notifications
+	notify := Changes()
+
 	for {
 		select {
+		case msg := <-notify:
+			fmt.Fprintf(w, "event: update\ndata: %s\n\n", msg)
+			flusher.Flush()
+
 		case <-ticker.C:
 			fmt.Fprintf(w, ": heartbeat\n\n")
 			flusher.Flush()
 
-		case <-ctx.Done():
+		case <-r.Context().Done():
+			log.Println("[sse] client disconnected")
 			return
 		}
 	}

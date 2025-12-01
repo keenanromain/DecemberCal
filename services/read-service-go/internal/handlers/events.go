@@ -1,16 +1,15 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"readservice/internal/db"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// Event represents the API response returned by the read-service.
 type Event struct {
 	ID               string    `json:"id"`
 	Name             string    `json:"name"`
@@ -25,26 +24,18 @@ type Event struct {
 	PreparationNotes *string   `json:"preparation_notes"`
 }
 
-// ListEvents handles GET /events
 func ListEvents(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Pool.Query(r.Context(), `
 		SELECT 
-			id, 
-			name, 
-			description, 
-			start, 
-			"end",
-			location,
-			online_link,
-			min_attendees,
-			max_attendees,
-			location_notes,
-			preparation_notes
+			id, name, description, start, "end",
+			location, online_link,
+			min_attendees, max_attendees,
+			location_notes, preparation_notes
 		FROM events_read
 		ORDER BY start ASC
 	`)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "db query failed: "+err.Error(), 500)
 		return
 	}
 	defer rows.Close()
@@ -53,8 +44,14 @@ func ListEvents(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var e Event
-		var loc, link, locNotes, prepNotes sql.NullString
-		var min, max sql.NullInt32
+		var (
+			location         *string
+			onlineLink       *string
+			locationNotes    *string
+			preparationNotes *string
+			min              *int32
+			max              *int32
+		)
 
 		err := rows.Scan(
 			&e.ID,
@@ -62,47 +59,32 @@ func ListEvents(w http.ResponseWriter, r *http.Request) {
 			&e.Description,
 			&e.Start,
 			&e.End,
-			&loc,
-			&link,
+			&location,
+			&onlineLink,
 			&min,
 			&max,
-			&locNotes,
-			&prepNotes,
+			&locationNotes,
+			&preparationNotes,
 		)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "scan failed: "+err.Error(), 500)
 			return
 		}
 
-		if loc.Valid {
-			val := loc.String
-			e.Location = &val
-		}
-
-		if link.Valid {
-			val := link.String
-			e.OnlineLink = &val
-		}
-
-		if min.Valid {
-			v := int(min.Int32)
+		// Normalize int32 → int
+		if min != nil {
+			v := int(*min)
 			e.MinAttendees = &v
 		}
-
-		if max.Valid {
-			v := int(max.Int32)
+		if max != nil {
+			v := int(*max)
 			e.MaxAttendees = &v
 		}
 
-		if locNotes.Valid {
-			val := locNotes.String
-			e.LocationNotes = &val
-		}
-
-		if prepNotes.Valid {
-			val := prepNotes.String
-			e.PreparationNotes = &val
-		}
+		e.Location = location
+		e.OnlineLink = onlineLink
+		e.LocationNotes = locationNotes
+		e.PreparationNotes = preparationNotes
 
 		events = append(events, e)
 	}
@@ -111,83 +93,67 @@ func ListEvents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(events)
 }
 
-// GetEvent handles GET /events/{id}
 func GetEvent(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/events/"):] // simple routing extraction
+	id := strings.TrimPrefix(r.URL.Path, "/events/")
+	if id == "" {
+		http.Error(w, "missing id", 400)
+		return
+	}
 
-	row := db.Pool.QueryRow(r.Context(), `
+	var (
+		e                Event
+		location         *string
+		onlineLink       *string
+		locationNotes    *string
+		preparationNotes *string
+		min              *int32
+		max              *int32
+	)
+
+	err := db.Pool.QueryRow(r.Context(), `
 		SELECT 
-			id,
-			name,
-			description,
-			start,
-			"end",
-			location,
-			online_link,
-			min_attendees,
-			max_attendees,
-			location_notes,
-			preparation_notes
+			id, name, description, start, "end",
+			location, online_link,
+			min_attendees, max_attendees,
+			location_notes, preparation_notes
 		FROM events_read
-		WHERE id=$1
-	`, id)
-
-	var e Event
-	var loc, link, locNotes, prepNotes sql.NullString
-	var min, max sql.NullInt32
-
-	err := row.Scan(
+		WHERE id = $1
+	`, id).Scan(
 		&e.ID,
 		&e.Name,
 		&e.Description,
 		&e.Start,
 		&e.End,
-		&loc,
-		&link,
+		&location,
+		&onlineLink,
 		&min,
 		&max,
-		&locNotes,
-		&prepNotes,
+		&locationNotes,
+		&preparationNotes,
 	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, "not found", http.StatusNotFound)
+			http.Error(w, "not found", 404)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "scan failed: "+err.Error(), 500)
 		return
 	}
 
-	if loc.Valid {
-		val := loc.String
-		e.Location = &val
-	}
-
-	if link.Valid {
-		val := link.String
-		e.OnlineLink = &val
-	}
-
-	if min.Valid {
-		v := int(min.Int32)
+	if min != nil {
+		v := int(*min)
 		e.MinAttendees = &v
 	}
-
-	if max.Valid {
-		v := int(max.Int32)
+	if max != nil {
+		v := int(*max)
 		e.MaxAttendees = &v
 	}
 
-	if locNotes.Valid {
-		val := locNotes.String
-		e.LocationNotes = &val
-	}
-
-	if prepNotes.Valid {
-		val := prepNotes.String
-		e.PreparationNotes = &val
-	}
+	e.Location = location
+	e.OnlineLink = onlineLink
+	e.LocationNotes = locationNotes
+	e.PreparationNotes = preparationNotes
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(e)
