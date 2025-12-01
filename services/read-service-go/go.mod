@@ -2,10 +2,7 @@ module readservice
 
 go 1.23.0
 
-require (
-	github.com/gorilla/mux v1.8.0
-	github.com/jackc/pgx/v5 v5.7.6
-)
+require github.com/jackc/pgx/v5 v5.7.6
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
