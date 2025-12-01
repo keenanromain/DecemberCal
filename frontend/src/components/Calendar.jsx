@@ -1,4 +1,3 @@
-// src/components/Calendar.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   Box,
@@ -15,7 +14,8 @@ import {
 import EventModal from "./EventModal";
 import eventsApi from "../api/events";
 
-const { readClient, updateEvent } = eventsApi;
+// Pull full API: fetchEvents, fetchEvent, updateEvent
+const { fetchEvents, fetchEvent, updateEvent } = eventsApi;
 
 const DECEMBER_YEAR = 2025;
 const DECEMBER_MONTH_INDEX = 11; // December
@@ -41,7 +41,6 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  // Drag state
   const dragInfoRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -52,38 +51,73 @@ export default function Calendar() {
   const days = buildDecemberGrid();
   const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  /**
+   * LOAD ALL EVENTS
+   */
   const loadEvents = async () => {
     try {
-      const res = await readClient.get("/events");
-      setEvents(res.data);
+      const data = await fetchEvents();
+      setEvents(data);
     } catch (err) {
-      console.error("[Calendar] load error:", err);
+      console.error("[Calendar] loadEvents error:", err);
     }
   };
 
+  /**
+   * DELETE EVENT LOCALLY
+   */
+  const deleteEventLocally = (id) => {
+    setEvents((prev) => prev.filter((ev) => ev.id !== id));
+  };
+
+  /**
+   * SSE WIRING — REAL-TIME UPDATES
+   */
   useEffect(() => {
-    loadEvents();
+    loadEvents(); // Load immediately on mount
+
     const source = new EventSource("http://localhost:4001/events/stream");
 
-    source.addEventListener("connected", (evt) => {
-      console.log("[SSE] connected:", evt.data);
-    });
-
-    source.addEventListener("update", (evt) => {
+    source.addEventListener("update", async (evt) => {
       try {
         const payload = JSON.parse(evt.data);
-        if (payload.type === "refresh") loadEvents();
+
+        switch (payload.type) {
+          case "insert":
+          case "update":
+            try {
+              const updated = await fetchEvent(payload.id);
+
+              setEvents((prev) => {
+                const exists = prev.some((e) => e.id === payload.id);
+                if (!exists) return [...prev, updated]; // new event
+                return prev.map((e) => (e.id === payload.id ? updated : e)); // updated event
+              });
+            } catch (err) {
+              console.error("[SSE fetchEvent failed]", err);
+              loadEvents();
+            }
+            break;
+
+          case "delete":
+            deleteEventLocally(payload.id);
+            break;
+
+          case "refresh":
+          default:
+            loadEvents();
+        }
       } catch (err) {
-        console.error("[SSE] parse error:", err);
+        console.error("[SSE parse error]", err);
       }
     });
-
-    source.onerror = (err) => console.error("[SSE] error:", err);
 
     return () => source.close();
   }, []);
 
-  // Build mapping of date → events
+  /**
+   * MAP EVENTS BY DATE FOR RENDERING
+   */
   const eventsByDate = useMemo(() => {
     const map = {};
     for (const ev of events) {
@@ -114,7 +148,7 @@ export default function Calendar() {
   };
 
   /**
-   * Move datetime to a new local calendar day (preserves time-of-day).
+   * MOVE DATE OF EVENT WHILE PRESERVING TIME
    */
   const moveDateToNewDay = (originalISO, targetDay) => {
     const original = new Date(originalISO);
@@ -138,7 +172,6 @@ export default function Calendar() {
     };
 
     setIsDragging(true);
-
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", ev.id);
   };
@@ -157,11 +190,7 @@ export default function Calendar() {
   };
 
   /**
-   * CLEAN PAYLOAD BUILDER
-   * Ensures:
-   *  - No nulls
-   *  - Only valid optional fields included
-   *  - One of location or online_link MUST exist
+   * CLEAN PAYLOAD FOR PUT /events/:id
    */
   const buildCleanPayload = (ev, newStart, newEnd) => {
     const payload = {
@@ -171,7 +200,6 @@ export default function Calendar() {
       end: newEnd,
     };
 
-    // Optional string fields (include only if non-empty)
     const stringFields = [
       ["location", ev.location],
       ["online_link", ev.online_link],
@@ -185,7 +213,6 @@ export default function Calendar() {
       }
     }
 
-    // Optional numeric fields
     if (typeof ev.min_attendees === "number") {
       payload.min_attendees = ev.min_attendees;
     }
@@ -193,21 +220,16 @@ export default function Calendar() {
       payload.max_attendees = ev.max_attendees;
     }
 
-    // Validate: must have either location or online_link
-    const hasLocation = !!payload.location;
-    const hasOnline = !!payload.online_link;
-
-    if (!hasLocation && !hasOnline) {
-      console.error("INVALID PAYLOAD:", payload);
-      throw new Error(
-        "Event must have either a location or an online link before drag/drop update."
-      );
+    if (!payload.location && !payload.online_link) {
+      throw new Error("Event must have either a location or online_link.");
     }
 
     return payload;
   };
 
-  /** Drop handler */
+  /**
+   * DRAG + DROP MOVE
+   */
   const handleDropOnDay = (day) => async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -216,46 +238,33 @@ export default function Calendar() {
     if (!dragInfo) return;
 
     const { eventId, originalStart, originalEnd } = dragInfo;
-
     const ev = events.find((x) => x.id === eventId);
-    if (!ev) {
-      console.error("[Calendar] drag-drop event not found");
-      dragInfoRef.current = null;
-      setIsDragging(false);
-      return;
-    }
+    if (!ev) return;
 
     const targetDate = new Date(DECEMBER_YEAR, DECEMBER_MONTH_INDEX, day);
 
     const originalDate = originalStart.split("T")[0];
     const targetKey = `2025-12-${String(day).padStart(2, "0")}`;
-
-    if (originalDate === targetKey) {
-      dragInfoRef.current = null;
-      setIsDragging(false);
-      return;
-    }
+    if (originalDate === targetKey) return;
 
     const newStart = moveDateToNewDay(originalStart, targetDate);
     const newEnd = moveDateToNewDay(originalEnd, targetDate);
 
     try {
       const payload = buildCleanPayload(ev, newStart, newEnd);
-
       await updateEvent(eventId, payload);
 
-      // Optimistic update
+      // optimistic update
       setEvents((prev) =>
         prev.map((x) =>
           x.id === eventId ? { ...x, start: newStart, end: newEnd } : x
         )
       );
     } catch (err) {
-      console.error("[Calendar] failed to move event:", err);
-
+      console.error("[move event failed]", err);
       toast({
         title: "Failed to move event",
-        description: err.message ?? "Check required fields.",
+        description: err.message ?? "Error updating event.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -336,7 +345,13 @@ export default function Calendar() {
                         No events
                       </Text>
                     ) : (
-                      <VStack mt={2} align="flex-start" spacing={1} maxH="70px" overflow="hidden">
+                      <VStack
+                        mt={2}
+                        align="flex-start"
+                        spacing={1}
+                        maxH="70px"
+                        overflow="hidden"
+                      >
                         {list.slice(0, 3).map((ev) => (
                           <Badge
                             key={ev.id}

@@ -24,7 +24,6 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgres://decembercal:decembercal@postgres:5432/decembercal?schema=public
-      PORT: 4000
     depends_on:
       postgres:
         condition: service_healthy

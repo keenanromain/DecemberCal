@@ -1,4 +1,3 @@
-// cmd/readsvc/main.go
 package main
 
 import (
@@ -30,7 +29,7 @@ func withCORS(handler http.HandlerFunc) http.HandlerFunc {
 }
 
 // Health endpoint
-func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -55,31 +54,17 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	ctx := context.Background()
-
-	// Connect to DB
 	if err := db.Connect(ctx); err != nil {
-		log.Fatal(err)
+		log.Fatalf("[read-service] failed to connect db: %v", err)
 	}
 
+	handlers.StartNotifier()
+
 	mux := http.NewServeMux()
-
-	// SSE: already sets its own CORS + headers
 	mux.HandleFunc("/events/stream", handlers.SSEHandler)
-
-	// EXACT MATCH: /events
-	mux.HandleFunc("/events", withCORS(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/events" {
-			http.NotFound(w, r)
-			return
-		}
-		handlers.ListEvents(w, r)
-	}))
-
-	// PREFIX MATCH: /events/{id}
+	mux.HandleFunc("/events", withCORS(handlers.ListEvents))
 	mux.HandleFunc("/events/", withCORS(handlers.GetEvent))
-
-	// Health check
-	mux.HandleFunc("/healthz", withCORS(HealthCheckHandler))
+	mux.HandleFunc("/healthz", withCORS(healthCheckHandler))
 
 	host := "0.0.0.0"
 	port := os.Getenv("PORT")
@@ -87,11 +72,13 @@ func main() {
 		port = "4001"
 	}
 
-	server := &http.Server{
-		Addr:    host + ":" + port,
-		Handler: mux,
+	addr := host + ":" + port
+	srv := &http.Server{
+		Addr:              addr,
+		ReadHeaderTimeout: 5 * time.Second,
+		Handler:           mux,
 	}
 
-	log.Printf("read-service listening on %s", host+":"+port)
-	log.Fatal(server.ListenAndServe())
+	log.Printf("[read-service] listening on %s", addr)
+	log.Fatal(srv.ListenAndServe())
 }

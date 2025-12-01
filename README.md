@@ -1,74 +1,161 @@
-# 🗓️ DecemberCal 📅
+# 🗓️ DecemberCal – Event-Driven Calendar 📅
 
-This project is an event-driven calendar application that lets users create, view, update, and delete events that they schedule through a simple web interface.
+This project is a fully containerized CQRS + SSE architecture built with Postgres, Go, TypeScript, React, and NGINX. It is an event-driven calendar system that allows users to create, edit, move (drag-drop), and delete events through a clean React UI. The project demonstrates its microservice design using:
 
-The project was developed using a microservice architecture composed of four independently containerized services:
+1. **Postgres** – canonical write model w/ a dedicated read replica
+2. **Write-Service (TypeScript)** – Express & Prisma ORM
+3. **Read-Service (Go)** – fast read API w/ Server-Sent Events (SSE)
+4. **Frontend** – React, Vite, & Chakra UI served by NGINX
 
-1. **Postgres** – the central relational database for persistent storage
-2. **Read-Service (Go)** – the backend service responsible for data reads
-3. **Write-Service (TypeScript)** – the backend service responsible for data writes, updates, and deletes
-4. **Frontend** – a lightweight UI that interacts with the read/write services
+The architecture uses CQRS, database triggers, SSE, `/healthcheckz` endpoints for container orchestration, NGINX for future hosting in a containerized cloud environment, and Docker-based isolation to create a decoupled system with real-time updates. Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
 
-Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
-
-At a high level, the system also includes Read Replication, Server Send Events (SSE), Database Migrations, `/healthcheckz` endpoints for container orchestration, and NGINX for future hosting in a containerized cloud environment.
-
-The project's data flow:
-
+A bird's-eye view of the project's data flow:
 ```
-frontend → write-service → events table → events_read table → read-service → SSE → frontend
+frontend -> write-service -> events table -> events_read table -> read-service -> SSE -> frontend
 ```
 
 To start the environment from scratch, use the helper script:
 ```
 ./docker_refresh.sh
 ```
+
 Once the stack is running, the application can be accessed on the browser at:
 ```
 http://localhost:8080/
 ```
 
-**Note**: All containers ensure that Docker builds and runs for ARM64 architecture. This was done to provide consistent builds on my Apple Silicon machine.
+**Note**: All containers are configured for ARM64 architecture to ensure consistent builds on my Apple Silicon machine, with future plans to support multi-architecture builds.
 
 ---
 ## Table of Contents
-1. <a href="#postgres">Postgres</a>
+1. <a href="#architecture-overview">Architecture Overview</a>
 
-2. <a href="#read-service-go">Read-Service (Go)</a>
+2. <a href="#data-flow">Data Flow</a>
 
-3. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
+3. <a href="#postgres">Postgres</a>
 
-4. <a href="#frontend">Frontend</a>
+4. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
 
-5. <a href="#usage">Usage</a>
+5. <a href="#read-service-go">Read-Service (Go)</a>
 
-6. <a href="#requirements">Requirements</a>
+6. <a href="#frontend">Frontend</a>
 
-7. <a href="#testing">Testing</a>
+7. <a href="#usage">Usage</a>
 
-8. <a href="#out-of-scope">Out of Scope</a>
+8. <a href="#requirements">Requirements</a>
+
+9. <a href="#testing">Testing</a>
+
+10. <a href="#out-of-scope">Out of Scope</a>
+
+---
+## Architecture Overview
+
+DecemberCal follows a **CQRS (Command Query Responsibility Segregation)** pattern:
+
+- Postgres
+    - Stores the canonical event data
+    - Uses a trigger function to mirror writes into a read-optimized replica
+- Write-Service (TypeScript/Express)
+    - Handles all event creation, updates, and deletes
+    - Writes to the canonical events table
+    - Runs Prisma migrations on startup
+- Read-Service (Go)
+    - Serves `GET /events` and `GET /events/:id`
+    - Streams real-time updates via `GET /events/stream` using SSE
+    - Reads only from events_read, the read replica
+- Frontend (React + Vite + Chakra UI)
+    - Displays the December 2025 calendar
+    - Supports drag-and-drop event movement
+    - Sends writes to the Write-Service
+    - Subscribes to SSE to reflect updates immediately
+    - Served by NGINX for fast static asset delivery
+
+### Why CQRS?
+
+1. Write paths remain simple and isolated
+
+2. Read paths become extremely fast due to single optimized table
+
+3. Cleaner separation of concerns 
+
+4. Services scale independently
+
+5. Higher throughput under application load
+
+### Service-to-port mapping
+
+| Service       | Port |
+| ------------- | ---- |
+| Postgres      | 5432 |
+| Write-Service | 4000 |
+| Read-Service  | 4001 |
+| Frontend      | 8080 |
+
+---
+## Data Flow
+```
+frontend
+   |
+    -> write-service (POST/PUT/DELETE)
+      |
+       -> postgres.events
+         |
+          -> TRIGGER sync_events_to_read()
+            |
+             -> postgres.events_read
+               |
+                -> read-service (SSE/GET)
+                   |
+                    -> frontend real-time UI
+
+```
+### Real-Time Sync Breakdown
+1. Write-Service performs INSERT/UPDATE/DELETE
+
+2. Postgres trigger updates `events_read`
+
+3. Trigger sends `pg_notify('events_changed', <payload>)`
+
+4. Go Read-Service listens using `LISTEN events_changed`
+
+5. Read-Service pushes SSE `event: update` to the browser
+
+6. Frontend fetches latest event data using event ID passed in SSE pipeline
+
+7. UI updates instantly without polling
 
 ---
 ## Postgres
 
 ### Overview
 
-The **postgres** architecture follows a *Command Query Responsibility Segregation (CQRS)* pattern where:
+The Postgres container hosts two tables:
 
-- **write-service** (TypeScript) performs all `INSERT`, `UPDATE`, and `DELETE` operations.
-- **read-service** (Go) reads data and exposes a high-performance, read-optimized SSE stream.
+1. `events` (canonical write model)
 
-Separating reads from writes was a design decision to ensure:
-- Higher throughput under application load  
-- Cleaner separation of concerns  
-- A more scalable and predictable architecture
+This table stores the authoritative source of truth for event data.
+
+2. `events_read` (read replica)
+
+Maintained by a Postgres trigger that mirrors all inserts/updates/deletes.
 
 ### Schema
 
-The primary `events` table:
+Both tables share the same structure. Below is the schema for the primary `events` table:
 <img width="1065" height="395" alt="Image" src="https://github.com/user-attachments/assets/8fd4a93d-13e1-45b5-939e-857e6ed4eb56" />
 
-The `events_read` is a read replica table that is updated via the `sync_events_to_read()` trigger as seen in the `events` schema above. The trigger guarantees eventual consistency between services. This approach prioritizes availability and partition tolerance from a CAP theorem perspective.
+The heart of this project is this trigger:
+
+```
+Triggers:
+    sync_events_read AFTER INSERT OR DELETE OR UPDATE ON events FOR EACH ROW EXECUTE FUNCTION sync_events_to_read()
+```
+It ensures:
+
+- updates propagate into the `events_read` table
+- SSE notifications are fired via pg_notify
+- eventual consistency with strong write guarantees
 
 ### Docker Configuration
 
@@ -97,54 +184,97 @@ volumes:
   postgres-data:
 ```
 
-Docker Compose confirms DB readiness via the `healtcheck` above. The other services only boot once the DB is accepting connections.
+Docker Compose confirms DB readiness via its `healtcheck`. The other services only boot once the DB is accepting connections and data persists via the named Docker volume.
 
-### Indexing
+---
+## Write-Service (TypeScript)
 
-The existing `events_pkey` provides a fast lookup by UUID.
+The **write-service** is the Command side of the CQRS architecture. It is responsible for creating events, updating events, and deleting events. It acts as the authoritative write-path for the system by validating user input using Zod and persisting data into the `events` table using Prisma ORM. The service runs Prisma migrations on startup.
+
+
+### Overview
+
+The write-service runs as compiled JavaScript in `dist/`. TypeScript is compiled into JavaScript only once to avoid the need for TypeScript dependencies at runtime. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4000, making the read API available at `http://localhost:4000`.
+
+### Tech Stack
+
+- Express (HTTP server)
+
+- Prisma ORM
+
+- Zod (schema validation)
+
+- Multi-stage Docker builds
+
+
+### Endpoints
+
+Express serves as the HTTP server layer for the write-service:
+
+| Method | Route            | Description                         |
+|--------|------------------|-------------------------------------|
+| POST   | `/events`        | Create a new event                  |
+| PUT    | `/events/:id`    | Update an existing event            |
+| DELETE | `/events/:id`    | Delete an event                     |
+| GET    | `/healthz`       | Health check                        |
+
+Because of strict method enforcement, **all** routes except `/healthz` reject GET requests.
+
+### Validation
+
+Payloads are validated using Zod:
+
+- All fields validated
+- start + end must be valid ISO strings w/ end > start
+- Must have **either** location **or** online_link
+- Optional notes and numeric fields
+
+This ensures that all malformed requests are rejected early.
+
+### Database Migrations
+
+On container startup (`entrypoint.sh`):
+
+```
+npx prisma migrate deploy
+```
+
+This guarantees that our database schema is always in-sync.
+
+### Health Check
+
+`GET /healthz`
+
+Returns the following when healthy
+
+`{ "status": "ok", "service": "write-service" }`
 
 ---
 
 ## Read-Service (Go) 
 
-The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4001, making the read API available at `http://localhost:4001`.
+The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads. It does this by reading from `events_read`, serving `GET /events` and `GET /events{id}` fast, streaming updates via SSE, and listening to the Postgres notify channel.
 
 ### Overview
 
-This service:
+The read-service is read-only by design. It uses pgxpool for efficient DB pooling and a Distroless runtime base image for increased security. Because its responsible for SSE, it uses a buffered channel for message handling and sends a heartbeat down the SSE pipeline every 15 seconds prevents dropped connections. The read-service waits for the postgres container to become healthy before booting and it exposes the internal server on 4001, making the read API available at `http://localhost:4001`.
 
-- Exposes `GET /events` and `GET /events/{id}`
-- Streams using **Server-Sent Events (SSE)** for instant UI updates
-- Is read-only by design
-- Can scale independently with replicas
+### Tech Stack
+- Go primitives (goroutines and channels) to listen for database changes
 
+- SSE to push eventID on DB notify
+
+- Pooled db connections
 
 ###  Endpoints
 
-#### `GET /events`
+| Method | Route            | Purpose              |
+| ------ | ---------------- | -------------------- |
+| GET    | `/events`        | List all events      |
+| GET    | `/events/{id}`   | Fetch specific event |
+| GET    | `/events/stream` | SSE stream           |
+| GET    | `/healthz`       | Health check         |
 
-Returns the full list of events.
-
-#### `GET /events/{id}`
-
-Returns a single event by UUID.
-
-#### `GET /events/stream`
-
-Returns a continuous SSE stream that emits `{ "type": "refresh" }` and a periodic heartbeat.
-
-### Architecture
-1. Go + Gorilla Mux
-
-Go provides low-latency JSON APIs that are useful for high-throughput read operations.
-
-2. SSE Hub (broadcast model)
-
-A custom hub that ensures safe concurrent writes via channels, auto-reconnects, and no polling.
-
-3. Database access
-
-Connections are pooled and reused for efficiency.
 
 ### Cross-Origin Resource Sharing (CORS) Configuration
 
@@ -164,117 +294,29 @@ Returns the following when healthy
 `{ "status": "ok", "service": "read-service" }`
 
 ---
-## Write-Service (TypeScript)
-
-The **write-service** is the Command side of the CQRS architecture. It is responsible for creating events, updating events, and deleting events. It acts as the authoritative write-path for the system, persisting data into the events table using Prisma ORM.
-
-
-### Overview
-
-The service runs as compiled JavaScript in `dist/`. TypeScript is compiled into JavaScript only once to avoid the need for ts-node or TypeScript dependencies at runtime. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4000, making the read API available at `http://localhost:4000`.
-
-
-### Endpoints
-
-Express serves as the HTTP server layer for the write-service:
-
-| Method | Route            | Description                         |
-|--------|------------------|-------------------------------------|
-| POST   | `/events`        | Create a new event                  |
-| PUT    | `/events/:id`    | Update an existing event            |
-| DELETE | `/events/:id`    | Delete an event                     |
-| GET    | `/healthz`       | Health check                        |
-
-Because of strict method enforcement, **all** routes except `/healthz` reject GET requests.
-
-### Architecture
-
-1. Express HTTP Layer
-
-Provides a lightweight and flexible API.
-
-2. Prisma ORM (Write Model)
-
-The service can interact with Postgres in a type-safe, schema-driven way.
-
-3. Database access
-
-All writes are persisted into the canonical `events` table.
-
-### Validation
-
-Payloads are validated using Zod:
-
-- Required: name, start, end
-- Must have **either** location **or** online_link
-- Valid ISO date strings
-- Optional notes and numeric fields
-- End time must be after start
-
-This ensures that all malformed requests are rejected early.
-
-### Database Migrations
-
-Migrations occur during runtime with `services/write-service-tes/entrypoint.sh`. Any outstanding database migrations are triggered via `npx prisma migrate deploy`.
-
-### Health Check
-
-`GET /healthz`
-
-Returns the following when healthy
-
-`{ "status": "ok", "service": "write-service" }`
-
----
 
 ## Frontend
 
-The **frontend** service renders a December-based calendar UI, displays events streamed from backend services, and provides interfaces for creating, editing, and deleting events all with real-time updates.
+The **frontend** service renders a December-based calendar UI, allows CRUD operations, and supports drag-and-drop movement of events between dates.
 
 
 ### Overview
 
-The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. The frontend has working drag-and-drop capabilities. Any drag-drop PUT request retains all fields exactly as stored in DB. The frontend depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
+The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. It also enforces strict frontend-side validation on submission. Despite this, it also has working drag-and-drop capabilities. This relies on PUT requests on the backend retaining all fields except the modified date. The frontend service depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
 
-### Endpoints
+### Tech Stack
 
-On page load, the frontend:
-  - Performs a REST `GET` to `/events` on the **read-service**.
-  - Establishes an **SSE connection** to `/events/stream`.
+- React (renders the UI)
 
-When a user creates/edits/deletes an event:
-  - The frontend calls the **write-service** (REST `POST/PUT/DELETE` to `/events`).
-  - The backend’s trigger (`sync_events_to_read`) keeps the read database in sync.
-  - The read service emits a `{ "type": "refresh" }` event on the SSE stream.
-  - The frontend listens for that SSE event and re-fetches `/events`, ensuring the UI is immediately up to date.
+- Vite (bundling and local development)
 
-The frontend exposes port 80.
+- Chakra UI (component library for layout, themes, responsive design)
 
-### Architecture
+- Axios (fetch-style API clients via `src/api/events.js`)
 
-1. React
+- Nginx (serves the build output / static assets)
 
-Renders the user interface and manages application state
-
-2. Vite
-
-For bundling and local development
-
-3. Chakra UI
-
-Component library for layout, themes, responsive design
-
-4. Axios
-
-Fetch-style API clients (via `src/api/events.js`)
-
-6. Nginx
-
-Serves the build output / static assets
-
-5. SSE
-
-Stream keeps the UI synchronized
+- SSE
 
 ### Components
 
@@ -283,11 +325,13 @@ Stream keeps the UI synchronized
   - Groups events by date and shows badges within each day cell.
   - Clicking a day opens an **event creation modal**.
   - Clicking an event badge opens an **event editing modal**.
+  - Includes support for drag-and-drop event movement.
+  - Establishes SSE downstream connection for live updates.
 
 - **`EventModal.jsx`**
-  - Handles both *create* and *edit* flows.
+  - Handles *create* , *edit*, and *delete* flows.
   - Validates required fields before submitting.
-  - Talks to the write API (`POST/PUT/DELETE /events`).
+  - Talks to the write API (via `POST/PUT/DELETE /events`).
 
 - **`api/events.js`**
   - Centralizes API configuration and endpoints for both read and write services.
@@ -295,17 +339,8 @@ Stream keeps the UI synchronized
     - **Read service** (e.g. `GET /events`, `GET /events/:id`, SSE `/events/stream`)
     - **Write service** (e.g. `POST/PUT/DELETE /events`)
 
-### Build-Time Configuration
-
-The frontend uses Vite’s `VITE_*` env variables, baked in build time. They live in `.env.production`:
-
-```yaml
-VITE_READ_API=http://localhost:4001
-VITE_WRITE_API=http://localhost:4000
-```
-
-### Run-Time Configuration
-The frontend is served using Nginx for long-term asset caching, SPA routing through `try_files`, and high-performance static file serving.
+### NGINX Runtime
+The frontend is served using Nginx for caching and SPA routing through `try_files` and an index.html backup:
 
 ```conf
 server {
@@ -338,18 +373,25 @@ The frontend therefore can rely on a small and clean final image because of the 
 ---
 ## Usage
 
-The `./docker_refresh` script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. If Docker is turned off, the refresh script turns it on. 
+It is recommended to use the helper script:
+```
+./docker_refresh.sh
+```
 
-The bash code wraps around the following core commands:
+The script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. If Docker is turned off, the refresh script turns it on. 
+
+The bash script wraps around the following core commands:
 
 1. Cleans all containers, volumes, networks
-```bash
+
+```
 docker compose down -v --remove-orphans
 docker system prune -f
 ```
 
 2. Rebuilds everything from scratch
-```bash
+
+```
 docker compose up -d --build
 ```
 
@@ -366,11 +408,12 @@ docker compose up -d --build
 4. Waits for backend `/healthz` endpoints to succeed
 
 5. Validates SSE readiness
-```bash
+
+```
 curl -sfN http://localhost:4001/events/stream
 ```
 
-6. Opens http://localhost:8080 on the browser
+6. Provides the elapsed runtime for startup
 
 ---
 
@@ -390,7 +433,8 @@ Download:
 https://www.docker.com/products/docker-desktop/
 
 Verify your install:
-```bash
+
+```
 docker --version
 docker compose version
 ```
@@ -400,7 +444,8 @@ docker compose version
 All service tests in the test suite use `curl` to hit API endpoints. The `curl` command is installed by default for macOS.
 
 Install for linux:
-```bash
+
+```
 sudo apt install curl
 
 curl --version
@@ -411,7 +456,8 @@ curl --version
 The test suite uses `jq` to parse JSON responses.
 
 Install:
-```bash
+
+```
 brew install jq       # macOS
 sudo apt install jq   # Ubuntu/Debian
 
@@ -428,7 +474,8 @@ Download:
 https://nodejs.org/en/download 
 
 Verify your install:
-```bash
+
+```
 node -v
 npm -v
 ```
@@ -437,7 +484,7 @@ npm -v
 
 ## Testing
 
-This project includes a shell-based test suite. The tests are lightweight (pure Bash + curl + jq) so they can be executed in any environment without requiring Node, Jest, or other test runners. They provide coverage for:
+DecemberCal has a Bash-based test suite. The tests are lightweight so they can be executed in any environment without requiring Node, Jest, or other test runners. They provide coverage for:
 
 - Write-service behavior
 
@@ -451,43 +498,47 @@ This project includes a shell-based test suite. The tests are lightweight (pure 
 
 ### Test execution
 
-You can run all of the tests from inside the project root:
-```bash
+All tests live inside of the `./tests` directory. You can run all of the tests via one script at the root directory level by doing the following:
+
+```
 ./tests/run_all_tests.sh
 ```
 
-All tests live in the `./tests` directory.
 
 ---
 
 ## Out of Scope
-This project is designed to showcase a simple event-driven microservice architecture. To avoid unnecessary complexity and keep my work focused, the following items fall outside the intended functionality:
+This project is designed to showcase a simple event-driven microservice architecture. To keep the project organized and focused, the following are intentionally left out:
 
-1. Search functionality for events (i.e. `GET /search?q={searchQuery}` on a database like ElasticSearch)
+1. Search functionality for events (i.e. `GET /search?q={searchQuery}`)
 2. Authentication & Authorization (i.e. login required for `POST`, `PUT`, and `DELETE`)
 3. Hosting in AWS (services likely required: ECR, ECS, RDS, ALB / API Gateway, SSM Parameter Store, CloudWatch, VPC, and Route 53)
 ```
-        +-----------------+
+        -------------------
         | Client frontend |
-        +--------+--------+ 
+        ---------v--------- 
                  |
-          +-------------+
+          -------+-------
           | API Gateway |
-          +------+------+ 
+          -------+------- 
                  |
-        +--------+--------+
+        ----<----+----<----
         |                 |
- ECS TypeScript         ECS Go
- write-service          read-service
+--------v--------   ------^-------- 
+| ECS TypeScript|   | ECS Go      |
+| write-service |   | read-service|
+--------v--------   ------^--------           
         |                 |
-        +--------+--------+
+        ---->----+---->----
                  |
-            RDS Postgres
+        ---------^---------
+        |   RDS Postgres  |
+        ------------------- 
 ```
-4. GitHub Actions for CI/CD into the cloud
-5. Infrastructure as Code (Terraform or CloudFormation if in AWS)
-6. Use more beefy base images for Docker
-7. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
-8. Monitoring & Observability (Prometheus + Grafana and ELK)
-9. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
-10. Add argument flags for the startup `./refresh_docker` script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
+4. Multi-calendar support for every month in 2026
+5. CI/CD (GitHub Actions)
+6. Infrastructure as Code (Terraform or CloudFormation if in AWS)
+7. Monitoring & Observability (Prometheus & Grafana)
+8. More complex orchestrators (Kubernetes)
+9. Support flags for the helper script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
+10. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
