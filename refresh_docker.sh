@@ -205,19 +205,6 @@ else
 fi
 
 ###############################################
-# Auto-open browser to the frontend
-###############################################
-log "🌐 Opening frontend in browser…"
-
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  open http://localhost:8080
-elif command -v xdg-open >/dev/null 2>&1; then
-  xdg-open http://localhost:8080
-else
-  warn "⚠️ Couldn't auto-open browser. Visit: http://localhost:8080/"
-fi
-
-###############################################
 # End time measurement
 ###############################################
 END_TIME=$(date +%s)
@@ -225,5 +212,3 @@ ELAPSED=$(( END_TIME - START_TIME ))
 
 success "🎉 All services UP AND HEALTHY!"
 success "⏱️ Environment ready in ${ELAPSED} seconds."
-echo ""
-
