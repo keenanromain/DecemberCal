@@ -1,28 +1,19 @@
-FROM golang:1.23 AS builder
+# Build stage
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 
-RUN go mod download
+RUN GOOS=linux GOARCH=arm64 go build -o readsvc ./cmd/readsvc
 
-# Build ARM64 binary for M1/M2 Mac Docker
-RUN GOARCH=arm64 GOOS=linux go build -o readsvc ./cmd/readsvc
-
-
-# --------------------------
-# Runtime (Debian slim)
-# --------------------------
-FROM debian:stable-slim
+# Runtime
+FROM gcr.io/distroless/base-debian12
 
 WORKDIR /app
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    apt-get clean
-
 COPY --from=builder /app/readsvc ./readsvc
-
-EXPOSE 4001
 
 CMD ["./readsvc"]

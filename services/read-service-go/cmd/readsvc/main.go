@@ -1,3 +1,4 @@
+// cmd/readsvc/main.go
 package main
 
 import (
@@ -10,13 +11,11 @@ import (
 
 	"readservice/internal/db"
 	"readservice/internal/handlers"
-
-	"github.com/gorilla/mux"
 )
 
-// CORS
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// CORS wrapper
+func withCORS(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -26,18 +25,20 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r)
-	})
+		handler(w, r)
+	}
 }
 
-func methodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Method Not Allowed — read-service only supports GET", http.StatusMethodNotAllowed)
-}
-
+// Health endpoint
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 	defer cancel()
 
 	status := map[string]string{"service": "read-service"}
@@ -49,29 +50,36 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 		status["status"] = "ok"
 	}
 
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 func main() {
 	ctx := context.Background()
 
-	// connect to DB
+	// Connect to DB
 	if err := db.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
 
-	// start SSE hub
-	go handlers.Hub.Run()
+	mux := http.NewServeMux()
 
-	r := mux.NewRouter()
-	r.MethodNotAllowedHandler = http.HandlerFunc(methodNotAllowed)
-	r.Use(corsMiddleware)
+	// SSE: already sets its own CORS + headers
+	mux.HandleFunc("/events/stream", handlers.SSEHandler)
 
-	// ORDER MATTERS
-	r.HandleFunc("/events/stream", handlers.SSEHandler).Methods(http.MethodGet)
-	r.HandleFunc("/events", handlers.ListEvents).Methods(http.MethodGet)
-	r.HandleFunc("/events/{id}", handlers.GetEvent).Methods(http.MethodGet)
-	r.HandleFunc("/healthz", HealthCheckHandler).Methods(http.MethodGet)
+	// EXACT MATCH: /events
+	mux.HandleFunc("/events", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/events" {
+			http.NotFound(w, r)
+			return
+		}
+		handlers.ListEvents(w, r)
+	}))
+
+	// PREFIX MATCH: /events/{id}
+	mux.HandleFunc("/events/", withCORS(handlers.GetEvent))
+
+	// Health check
+	mux.HandleFunc("/healthz", withCORS(HealthCheckHandler))
 
 	host := "0.0.0.0"
 	port := os.Getenv("PORT")
@@ -81,9 +89,9 @@ func main() {
 
 	server := &http.Server{
 		Addr:    host + ":" + port,
-		Handler: r,
+		Handler: mux,
 	}
 
-	log.Printf("Read-service listening on %s", host+":"+port)
+	log.Printf("read-service listening on %s", host+":"+port)
 	log.Fatal(server.ListenAndServe())
 }
