@@ -487,7 +487,6 @@ This project is designed to showcase a simple event-driven microservice architec
 4. GitHub Actions for CI/CD into the cloud
 5. Infrastructure as Code (Terraform or CloudFormation if in AWS)
 6. Use more beefy base images for Docker
-7. DB pre-populated with example events (i.e. Christmas, NYE, Hanukkah, Kwanzaa, etc.)
+7. Add flags for script startup (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
 8. Monitoring & Observability (Prometheus + Grafana and ELK)
 9. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
-10. Add argument flags for the startup `./refresh_docker` script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
