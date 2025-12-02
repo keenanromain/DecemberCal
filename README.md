@@ -1,6 +1,6 @@
 # 🗓️ DecemberCal – Event-Driven Calendar 📅
 
-This microservice project is a fully containerized CQRS + SSE architecture built with Postgres, Go, TypeScript, React, and NGINX. It is an event-driven calendar system that allows users to create, edit, move (drag-drop), and delete events through a clean React UI. The project demonstrates its microservice design using:
+This project is a fully containerized CQRS + SSE architecture built with Postgres, Go, TypeScript, React, and NGINX. It is an event-driven calendar system that allows users to create, edit, move (drag-drop), and delete events through a clean React UI. The project demonstrates its microservice design using:
 
 1. **Postgres** – canonical write model w/ a dedicated read replica
 2. **Write-Service (TypeScript)** – Express & Prisma ORM
