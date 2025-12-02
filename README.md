@@ -34,9 +34,9 @@ http://localhost:8080/
 
 3. <a href="#postgres">Postgres</a>
 
-4. <a href="#read-service-go">Read-Service (Go)</a>
+4. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
 
-5. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
+5. <a href="#read-service-go">Read-Service (Go)</a>
 
 6. <a href="#frontend">Frontend</a>
 
@@ -179,47 +179,94 @@ volumes:
 Docker Compose confirms DB readiness via its `healtcheck`. The other services only boot once the DB is accepting connections and data persists via the named Docker volume.
 
 ---
+## Write-Service (TypeScript)
 
-## Read-Service (Go) 
+The **write-service** is the Command side of the CQRS architecture. It is responsible for creating events, updating events, and deleting events. It acts as the authoritative write-path for the system by validating user input using Zod and persisting data into the `events` table using Prisma ORM. The service runs Prisma migrations on startup.
 
-The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4001, making the read API available at `http://localhost:4001`.
 
 ### Overview
 
-This service:
+The write-service runs as compiled JavaScript in `dist/`. TypeScript is compiled into JavaScript only once to avoid the need for TypeScript dependencies at runtime. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4000, making the read API available at `http://localhost:4000`.
 
-- Exposes `GET /events` and `GET /events/{id}`
-- Streams using **Server-Sent Events (SSE)** for instant UI updates
-- Is read-only by design
-- Can scale independently with replicas
+### Tech Stack
 
+- Express (HTTP server)
+
+- Prisma ORM
+
+- Zod (schema validation)
+
+- Multi-stage Docker builds
+
+
+### Endpoints
+
+Express serves as the HTTP server layer for the write-service:
+
+| Method | Route            | Description                         |
+|--------|------------------|-------------------------------------|
+| POST   | `/events`        | Create a new event                  |
+| PUT    | `/events/:id`    | Update an existing event            |
+| DELETE | `/events/:id`    | Delete an event                     |
+| GET    | `/healthz`       | Health check                        |
+
+Because of strict method enforcement, **all** routes except `/healthz` reject GET requests.
+
+### Validation
+
+Payloads are validated using Zod:
+
+- All fields validated
+- start + end must be valid ISO strings w/ end > start
+- Must have **either** location **or** online_link
+- Optional notes and numeric fields
+
+This ensures that all malformed requests are rejected early.
+
+### Database Migrations
+
+On container startup (`entrypoint.sh`):
+
+```
+npx prisma migrate deploy
+```
+
+This guarantees that our database schema is always in-sync.
+
+### Health Check
+
+`GET /healthz`
+
+Returns the following when healthy
+
+`{ "status": "ok", "service": "write-service" }`
+
+---
+
+## Read-Service (Go) 
+
+The **read-service** is the Query side of the CQRS architecture. It is highly optimized for fast, read-heavy workloads. It does this by reading from `events_read`, serving `GET /events` and `GET /events{id}` fast, streaming updates via SSE, and listening to the Postgres notify channel.
+
+### Overview
+
+The read-service is read-only by design. It uses pgxpool for efficient DB pooling and a Distroless runtime base image for increased security. Because its responsible for SSE, it uses a buffered channel for message handling and sends a heartbeat down the SSE pipeline every 15 seconds prevents dropped connections. The read-service waits for the postgres container to become healthy before booting and it exposes the internal server on 4001, making the read API available at `http://localhost:4001`.
+
+### Tech Stack
+- Go primitives (goroutines and channels) to listen for database changes
+
+- SSE to push eventID on DB notify
+
+- Pooled db connections
 
 ###  Endpoints
 
-#### `GET /events`
+| Method | Route            | Purpose              |
+| ------ | ---------------- | -------------------- |
+| GET    | `/events`        | List all events      |
+| GET    | `/events/{id}`   | Fetch specific event |
+| GET    | `/events/stream` | SSE stream           |
+| GET    | `/healthz`       | Health check         |
 
-Returns the full list of events.
-
-#### `GET /events/{id}`
-
-Returns a single event by UUID.
-
-#### `GET /events/stream`
-
-Returns a continuous SSE stream that emits `{ "type": "refresh" }` and a periodic heartbeat.
-
-### Architecture
-1. Go + Gorilla Mux
-
-Go provides low-latency JSON APIs that are useful for high-throughput read operations.
-
-2. SSE Hub (broadcast model)
-
-A custom hub that ensures safe concurrent writes via channels, auto-reconnects, and no polling.
-
-3. Database access
-
-Connections are pooled and reused for efficiency.
 
 ### Cross-Origin Resource Sharing (CORS) Configuration
 
@@ -237,68 +284,6 @@ The service remains secure because the service is read-only.
 Returns the following when healthy
 
 `{ "status": "ok", "service": "read-service" }`
-
----
-## Write-Service (TypeScript)
-
-The **write-service** is the Command side of the CQRS architecture. It is responsible for creating events, updating events, and deleting events. It acts as the authoritative write-path for the system, persisting data into the events table using Prisma ORM.
-
-
-### Overview
-
-The service runs as compiled JavaScript in `dist/`. TypeScript is compiled into JavaScript only once to avoid the need for ts-node or TypeScript dependencies at runtime. It waits for the postgres container to become healthy before booting and it exposes the internal server on 4000, making the read API available at `http://localhost:4000`.
-
-
-### Endpoints
-
-Express serves as the HTTP server layer for the write-service:
-
-| Method | Route            | Description                         |
-|--------|------------------|-------------------------------------|
-| POST   | `/events`        | Create a new event                  |
-| PUT    | `/events/:id`    | Update an existing event            |
-| DELETE | `/events/:id`    | Delete an event                     |
-| GET    | `/healthz`       | Health check                        |
-
-Because of strict method enforcement, **all** routes except `/healthz` reject GET requests.
-
-### Architecture
-
-1. Express HTTP Layer
-
-Provides a lightweight and flexible API.
-
-2. Prisma ORM (Write Model)
-
-The service can interact with Postgres in a type-safe, schema-driven way.
-
-3. Database access
-
-All writes are persisted into the canonical `events` table.
-
-### Validation
-
-Payloads are validated using Zod:
-
-- Required: name, start, end
-- Must have **either** location **or** online_link
-- Valid ISO date strings
-- Optional notes and numeric fields
-- End time must be after start
-
-This ensures that all malformed requests are rejected early.
-
-### Database Migrations
-
-Migrations occur during runtime with `services/write-service-tes/entrypoint.sh`. Any outstanding database migrations are triggered via `npx prisma migrate deploy`.
-
-### Health Check
-
-`GET /healthz`
-
-Returns the following when healthy
-
-`{ "status": "ok", "service": "write-service" }`
 
 ---
 
