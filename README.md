@@ -1,74 +1,153 @@
-# 🗓️ DecemberCal 📅
+# 🗓️ DecemberCal – Event-Driven Microservice Calendar 📅
 
-This project is an event-driven calendar application that lets users create, view, update, and delete events that they schedule through a simple web interface.
+This project is a fully containerized CQRS + SSE architecture built with Postgres, Go, TypeScript, React, and NGINX. It is an event-driven calendar system that allows users to create, edit, move (drag-drop), and delete events through a clean React UI. The project demonstrates its microservice design using:
 
-The project was developed using a microservice architecture composed of four independently containerized services:
+1. **Postgres** – canonical write model w/ a dedicated read replica
+2. **Read-Service (Go)** – fast read API w/ Server-Sent Events (SSE)
+3. **Write-Service (TypeScript)** – Express & Prisma ORM
+4. **Frontend** – React, Vite, & Chakra UI served by NGINX
 
-1. **Postgres** – the central relational database for persistent storage
-2. **Read-Service (Go)** – the backend service responsible for data reads
-3. **Write-Service (TypeScript)** – the backend service responsible for data writes, updates, and deletes
-4. **Frontend** – a lightweight UI that interacts with the read/write services
+The architecture uses CQRS, database triggers, SSE, `/healthcheckz` endpoints for container orchestration, NGINX for future hosting in a containerized cloud environment, and Docker-based isolation to create a decoupled system with real-time updates. Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
 
-Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
-
-At a high level, the system also includes Read Replication, Server Send Events (SSE), Database Migrations, `/healthcheckz` endpoints for container orchestration, and NGINX for future hosting in a containerized cloud environment.
-
-The project's data flow:
-
+A bird's-eye view of the project's general data flow:
 ```
-frontend → write-service → events table → events_read table → read-service → SSE → frontend
+frontend -> write-service -> events table -> events_read table -> read-service -> SSE -> frontend
 ```
 
 To start the environment from scratch, use the helper script:
 ```
 ./docker_refresh.sh
 ```
+
 Once the stack is running, the application can be accessed on the browser at:
 ```
 http://localhost:8080/
 ```
 
-**Note**: All containers ensure that Docker builds and runs for ARM64 architecture. This was done to provide consistent builds on my Apple Silicon machine.
+**Note**: All containers are configured for ARM64 architecture to ensure consistent builds on my Apple Silicon machine, with future plans to support multi-architecture builds.
 
 ---
 ## Table of Contents
-1. <a href="#postgres">Postgres</a>
+1. <a href="#architecture-overview">Architecture Overview</a>
 
-2. <a href="#read-service-go">Read-Service (Go)</a>
+2. <a href="#data-flow">Data Flow</a>
 
-3. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
+3. <a href="#postgres">Postgres</a>
 
-4. <a href="#frontend">Frontend</a>
+4. <a href="#read-service-go">Read-Service (Go)</a>
 
-5. <a href="#usage">Usage</a>
+5. <a href="#write-service-typescript">Write-Service (TypeScript)</a>
 
-6. <a href="#requirements">Requirements</a>
+6. <a href="#frontend">Frontend</a>
 
-7. <a href="#testing">Testing</a>
+7. <a href="#usage">Usage</a>
 
-8. <a href="#out-of-scope">Out of Scope</a>
+8. <a href="#requirements">Requirements</a>
+
+9. <a href="#testing">Testing</a>
+
+10. <a href="#out-of-scope">Out of Scope</a>
+
+---
+## Architecture Overview
+
+DecemberCal follows a **CQRS (Command Query Responsibility Segregation)** pattern:
+
+- Write-Service (TypeScript/Express)
+    - Handles all event creation, updates, and deletes
+    - Writes to the canonical events table
+    - Runs Prisma migrations on startup
+- Postgres
+    - Stores the canonical event data
+    - Uses a trigger function to mirror writes into a read-optimized replica
+- Read-Service (Go)
+    - Serves GET /events and GET /events/:id
+    - Streams real-time updates via /events/stream using SSE
+    - Reads only from events_read, the read replica
+- Frontend (React + Vite + Chakra UI)
+    - Displays the December 2025 calendar
+    - Supports drag-and-drop event movement
+    - Sends writes to the Write-Service
+    - Subscribes to SSE to reflect updates immediately
+    - Served by NGINX for fast static asset delivery
+
+#### Why CQRS?
+
+1. Write paths remain simple and isolated
+
+2. Read paths become extremely fast due to single optimized table
+
+3. Cleaner separation of concerns 
+
+4. Services scale independently
+
+5. Higher throughput under application load
+
+---
+## Data Flow
+```
+frontend
+   |
+    -> write-service (POST/PUT/DELETE)
+      |
+       -> postgres.events
+         |
+          -> TRIGGER sync_events_to_read()
+            |
+             -> postgres.events_read
+               |
+                -> read-service (SSE/GET)
+                   |
+                    -> frontend real-time UI
+
+```
+### Real-Time Sync Breakdown
+1. Write-Service performs INSERT/UPDATE/DELETE
+
+2. Postgres trigger updates `events_read`
+
+3. Trigger sends `pg_notify('events_changed', <payload>)`
+
+4. Go Read-Service listens using `LISTEN events_changed`
+
+5. Read-Service pushes SSE `event: update` to the browser
+
+6. Frontend fetches latest event data
+
+7. UI updates instantly without polling
 
 ---
 ## Postgres
 
 ### Overview
 
-The **postgres** architecture follows a *Command Query Responsibility Segregation (CQRS)* pattern where:
+The Postgres container hosts two tables:
 
-- **write-service** (TypeScript) performs all `INSERT`, `UPDATE`, and `DELETE` operations.
-- **read-service** (Go) reads data and exposes a high-performance, read-optimized SSE stream.
+1. `events` (canonical write model)
 
-Separating reads from writes was a design decision to ensure:
-- Higher throughput under application load  
-- Cleaner separation of concerns  
-- A more scalable and predictable architecture
+This table stores the authoritative source of truth for event data.
+
+2. `events_read` (read replica)
+
+Maintained by a Postgres trigger that mirrors all inserts/updates/deletes.
+
 
 ### Schema
 
-The primary `events` table:
+Both tables share the same structure. Below is the schema for the primary `events` table:
 <img width="1065" height="395" alt="Image" src="https://github.com/user-attachments/assets/8fd4a93d-13e1-45b5-939e-857e6ed4eb56" />
 
-The `events_read` is a read replica table that is updated via the `sync_events_to_read()` trigger as seen in the `events` schema above. The trigger guarantees eventual consistency between services. This approach prioritizes availability and partition tolerance from a CAP theorem perspective.
+The heart of this project is this trigger:
+
+```
+Triggers:
+    sync_events_read AFTER INSERT OR DELETE OR UPDATE ON events FOR EACH ROW EXECUTE FUNCTION sync_events_to_read()
+```
+It ensures:
+
+- updates propagate into the `events_read` table
+- SSE notifications are fired via pg_notify
+- eventual consistency with strong write guarantees
 
 ### Docker Configuration
 
@@ -97,11 +176,7 @@ volumes:
   postgres-data:
 ```
 
-Docker Compose confirms DB readiness via the `healtcheck` above. The other services only boot once the DB is accepting connections.
-
-### Indexing
-
-The existing `events_pkey` provides a fast lookup by UUID.
+Docker Compose confirms DB readiness via its `healtcheck`. The other services only boot once the DB is accepting connections and data persists via the named Docker volume.
 
 ---
 
