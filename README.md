@@ -121,7 +121,7 @@ frontend
 
 5. Read-Service pushes SSE `event: update` to the browser
 
-6. Frontend fetches latest event data
+6. Frontend fetches latest event data using event ID passed in SSE pipeline
 
 7. UI updates instantly without polling
 
