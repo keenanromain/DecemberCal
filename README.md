@@ -71,7 +71,7 @@ DecemberCal follows a **CQRS (Command Query Responsibility Segregation)** patter
     - Subscribes to SSE to reflect updates immediately
     - Served by NGINX for fast static asset delivery
 
-#### Why CQRS?
+### Why CQRS?
 
 1. Write paths remain simple and isolated
 
@@ -82,6 +82,15 @@ DecemberCal follows a **CQRS (Command Query Responsibility Segregation)** patter
 4. Services scale independently
 
 5. Higher throughput under application load
+
+### Service-to-port mapping
+
+| Service       | Port |
+| ------------- | ---- |
+| Postgres      | 5432 |
+| Write-Service | 4000 |
+| Read-Service  | 4001 |
+| Frontend      | 8080 |
 
 ---
 ## Data Flow
@@ -130,7 +139,6 @@ This table stores the authoritative source of truth for event data.
 2. `events_read` (read replica)
 
 Maintained by a Postgres trigger that mirrors all inserts/updates/deletes.
-
 
 ### Schema
 
@@ -289,52 +297,26 @@ Returns the following when healthy
 
 ## Frontend
 
-The **frontend** service renders a December-based calendar UI, displays events streamed from backend services, and provides interfaces for creating, editing, and deleting events all with real-time updates.
+The **frontend** service renders a December-based calendar UI, allows CRUD operations, and supports drag-and-drop movement of events between dates.
 
 
 ### Overview
 
-The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. The frontend has working drag-and-drop capabilities. Any drag-drop PUT request retains all fields exactly as stored in DB. The frontend depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
+The service is a single-page application that renders the December 2025 month grid, displays events, and opens modals on click. Each day of the month represents a unified modal for creating, editing, and deleting events. It also enforces strict frontend-side validation on submission. Despite this, it also has working drag-and-drop capabilities. This relies on PUT requests on the backend retaining all fields except the modified date. The frontend service depends on the `read-service` and `write-service` containers and can be reached in the browser at http://localhost:8080/.
 
-### Endpoints
+### Tech Stack
 
-On page load, the frontend:
-  - Performs a REST `GET` to `/events` on the **read-service**.
-  - Establishes an **SSE connection** to `/events/stream`.
+- React (renders the UI)
 
-When a user creates/edits/deletes an event:
-  - The frontend calls the **write-service** (REST `POST/PUT/DELETE` to `/events`).
-  - The backend’s trigger (`sync_events_to_read`) keeps the read database in sync.
-  - The read service emits a `{ "type": "refresh" }` event on the SSE stream.
-  - The frontend listens for that SSE event and re-fetches `/events`, ensuring the UI is immediately up to date.
+- Vite (bundling and local development)
 
-The frontend exposes port 80.
+- Chakra UI (component library for layout, themes, responsive design)
 
-### Architecture
+- Axios (fetch-style API clients via `src/api/events.js`)
 
-1. React
+- Nginx (serves the build output / static assets)
 
-Renders the user interface and manages application state
-
-2. Vite
-
-For bundling and local development
-
-3. Chakra UI
-
-Component library for layout, themes, responsive design
-
-4. Axios
-
-Fetch-style API clients (via `src/api/events.js`)
-
-6. Nginx
-
-Serves the build output / static assets
-
-5. SSE
-
-Stream keeps the UI synchronized
+- SSE
 
 ### Components
 
@@ -343,11 +325,13 @@ Stream keeps the UI synchronized
   - Groups events by date and shows badges within each day cell.
   - Clicking a day opens an **event creation modal**.
   - Clicking an event badge opens an **event editing modal**.
+  - Includes support for drag-and-drop event movement.
+  - Establishes SSE downstream connection for live updates.
 
 - **`EventModal.jsx`**
-  - Handles both *create* and *edit* flows.
+  - Handles *create* , *edit*, and *delete* flows.
   - Validates required fields before submitting.
-  - Talks to the write API (`POST/PUT/DELETE /events`).
+  - Talks to the write API (via `POST/PUT/DELETE /events`).
 
 - **`api/events.js`**
   - Centralizes API configuration and endpoints for both read and write services.
@@ -355,17 +339,8 @@ Stream keeps the UI synchronized
     - **Read service** (e.g. `GET /events`, `GET /events/:id`, SSE `/events/stream`)
     - **Write service** (e.g. `POST/PUT/DELETE /events`)
 
-### Build-Time Configuration
-
-The frontend uses Vite’s `VITE_*` env variables, baked in build time. They live in `.env.production`:
-
-```yaml
-VITE_READ_API=http://localhost:4001
-VITE_WRITE_API=http://localhost:4000
-```
-
-### Run-Time Configuration
-The frontend is served using Nginx for long-term asset caching, SPA routing through `try_files`, and high-performance static file serving.
+### NGINX Runtime
+The frontend is served using Nginx for caching and SPA routing through `try_files` and an index.html backup:
 
 ```conf
 server {
@@ -398,18 +373,25 @@ The frontend therefore can rely on a small and clean final image because of the 
 ---
 ## Usage
 
-The `./docker_refresh` script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. If Docker is turned off, the refresh script turns it on. 
+It is recommended to use the helper script:
+```
+./docker_refresh.sh
+```
 
-The bash code wraps around the following core commands:
+The script is a full-lifecycle environment reset and bootstrap tool. It ensures a stable and reproducible local environment every time you run it. If Docker is turned off, the refresh script turns it on. 
+
+The bash script wraps around the following core commands:
 
 1. Cleans all containers, volumes, networks
-```bash
+
+```
 docker compose down -v --remove-orphans
 docker system prune -f
 ```
 
 2. Rebuilds everything from scratch
-```bash
+
+```
 docker compose up -d --build
 ```
 
@@ -426,11 +408,12 @@ docker compose up -d --build
 4. Waits for backend `/healthz` endpoints to succeed
 
 5. Validates SSE readiness
-```bash
+
+```
 curl -sfN http://localhost:4001/events/stream
 ```
 
-6. Opens http://localhost:8080 on the browser
+6. Provides the elapsed runtime for startup
 
 ---
 
@@ -450,7 +433,8 @@ Download:
 https://www.docker.com/products/docker-desktop/
 
 Verify your install:
-```bash
+
+```
 docker --version
 docker compose version
 ```
@@ -460,7 +444,8 @@ docker compose version
 All service tests in the test suite use `curl` to hit API endpoints. The `curl` command is installed by default for macOS.
 
 Install for linux:
-```bash
+
+```
 sudo apt install curl
 
 curl --version
@@ -471,7 +456,8 @@ curl --version
 The test suite uses `jq` to parse JSON responses.
 
 Install:
-```bash
+
+```
 brew install jq       # macOS
 sudo apt install jq   # Ubuntu/Debian
 
@@ -488,7 +474,8 @@ Download:
 https://nodejs.org/en/download 
 
 Verify your install:
-```bash
+
+```
 node -v
 npm -v
 ```
@@ -497,7 +484,7 @@ npm -v
 
 ## Testing
 
-This project includes a shell-based test suite. The tests are lightweight (pure Bash + curl + jq) so they can be executed in any environment without requiring Node, Jest, or other test runners. They provide coverage for:
+DecemberCal has a Bash-based test suite. The tests are lightweight so they can be executed in any environment without requiring Node, Jest, or other test runners. They provide coverage for:
 
 - Write-service behavior
 
@@ -511,42 +498,48 @@ This project includes a shell-based test suite. The tests are lightweight (pure 
 
 ### Test execution
 
-You can run all of the tests from inside the project root:
-```bash
+All tests live inside of the `./tests` directory. You can run all of the tests via one script at the root directory level by doing the following:
+
+```
 ./tests/run_all_tests.sh
 ```
 
-All tests live in the `./tests` directory.
 
 ---
 
 ## Out of Scope
-This project is designed to showcase a simple event-driven microservice architecture. To avoid unnecessary complexity and keep my work focused, the following items fall outside the intended functionality:
+This project is designed to showcase a simple event-driven microservice architecture. To keep the project organized and focused, the following are intentionally left out:
 
-1. Search functionality for events (i.e. `GET /search?q={searchQuery}` on a database like ElasticSearch)
+1. Search functionality for events (i.e. `GET /search?q={searchQuery}`)
 2. Authentication & Authorization (i.e. login required for `POST`, `PUT`, and `DELETE`)
 3. Hosting in AWS (services likely required: ECR, ECS, RDS, ALB / API Gateway, SSM Parameter Store, CloudWatch, VPC, and Route 53)
 ```
-        +-----------------+
+        -------------------
         | Client frontend |
-        +--------+--------+ 
+        ---------v--------- 
                  |
-          +-------------+
+          -------+-------
           | API Gateway |
-          +------+------+ 
+          -------+------- 
                  |
-        +--------+--------+
+        ---------+---------
         |                 |
- ECS TypeScript         ECS Go
- write-service          read-service
+--------v--------   ------^--------- 
+| ECS TypeScript|   | ECS Go       |
+| write-service |   | read-service |
+--------v--------   ------^---------           
         |                 |
-        +--------+--------+
+        ---------+---------
                  |
-            RDS Postgres
+        ---------^---------
+        |   RDS Postgres  |
+        ------------------- 
 ```
-4. GitHub Actions for CI/CD into the cloud
+4. CI/CD (GitHub Actions)
 5. Infrastructure as Code (Terraform or CloudFormation if in AWS)
 6. Use more beefy base images for Docker
-7. Add flags for script startup (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
-8. Monitoring & Observability (Prometheus + Grafana and ELK)
-9. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
+7. More complex orchestrators (i.e. Kubernetes)
+8. Support flags for the helper script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
+9. Multi-calendar support (i.e. every month for 2026)
+10. Monitoring & Observability (Prometheus & Grafana)
+11. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
