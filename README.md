@@ -61,8 +61,8 @@ DecemberCal follows a **CQRS (Command Query Responsibility Segregation)** patter
     - Writes to the canonical events table
     - Runs Prisma migrations on startup
 - Read-Service (Go)
-    - Serves GET /events and GET /events/:id
-    - Streams real-time updates via /events/stream using SSE
+    - Serves `GET /events` and `GET /events/:id`
+    - Streams real-time updates via `GET /events/stream` using SSE
     - Reads only from events_read, the read replica
 - Frontend (React + Vite + Chakra UI)
     - Displays the December 2025 calendar
