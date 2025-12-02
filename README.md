@@ -537,9 +537,8 @@ This project is designed to showcase a simple event-driven microservice architec
 ```
 4. CI/CD (GitHub Actions)
 5. Infrastructure as Code (Terraform or CloudFormation if in AWS)
-6. Use more beefy base images for Docker
-7. More complex orchestrators (i.e. Kubernetes)
-8. Support flags for the helper script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
-9. Multi-calendar support (i.e. every month for 2026)
-10. Monitoring & Observability (Prometheus & Grafana)
-11. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
+6. More complex orchestrators (i.e. Kubernetes)
+7. Support flags for the helper script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
+8. Multi-calendar support (i.e. every month for 2026)
+9. Monitoring & Observability (Prometheus & Grafana)
+10. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
