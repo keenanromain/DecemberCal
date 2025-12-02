@@ -522,14 +522,14 @@ This project is designed to showcase a simple event-driven microservice architec
           | API Gateway |
           -------+------- 
                  |
-        ---------+---------
+        ----<----+----<----
         |                 |
 --------v--------   ------^-------- 
 | ECS TypeScript|   | ECS Go      |
 | write-service |   | read-service|
 --------v--------   ------^--------           
         |                 |
-        ---------+---------
+        ---->----+---->----
                  |
         ---------^---------
         |   RDS Postgres  |
