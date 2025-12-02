@@ -53,13 +53,13 @@ http://localhost:8080/
 
 DecemberCal follows a **CQRS (Command Query Responsibility Segregation)** pattern:
 
+- Postgres
+    - Stores the canonical event data
+    - Uses a trigger function to mirror writes into a read-optimized replica
 - Write-Service (TypeScript/Express)
     - Handles all event creation, updates, and deletes
     - Writes to the canonical events table
     - Runs Prisma migrations on startup
-- Postgres
-    - Stores the canonical event data
-    - Uses a trigger function to mirror writes into a read-optimized replica
 - Read-Service (Go)
     - Serves GET /events and GET /events/:id
     - Streams real-time updates via /events/stream using SSE
