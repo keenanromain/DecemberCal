@@ -3,8 +3,8 @@
 This project is a fully containerized CQRS + SSE architecture built with Postgres, Go, TypeScript, React, and NGINX. It is an event-driven calendar system that allows users to create, edit, move (drag-drop), and delete events through a clean React UI. The project demonstrates its microservice design using:
 
 1. **Postgres** – canonical write model w/ a dedicated read replica
-2. **Read-Service (Go)** – fast read API w/ Server-Sent Events (SSE)
-3. **Write-Service (TypeScript)** – Express & Prisma ORM
+2. **Write-Service (TypeScript)** – Express & Prisma ORM
+3. **Read-Service (Go)** – fast read API w/ Server-Sent Events (SSE)
 4. **Frontend** – React, Vite, & Chakra UI served by NGINX
 
 The architecture uses CQRS, database triggers, SSE, `/healthcheckz` endpoints for container orchestration, NGINX for future hosting in a containerized cloud environment, and Docker-based isolation to create a decoupled system with real-time updates. Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
