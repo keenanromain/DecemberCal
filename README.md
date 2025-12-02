@@ -9,7 +9,7 @@ This project is a fully containerized CQRS + SSE architecture built with Postgre
 
 The architecture uses CQRS, database triggers, SSE, `/healthcheckz` endpoints for container orchestration, NGINX for future hosting in a containerized cloud environment, and Docker-based isolation to create a decoupled system with real-time updates. Each service is orchestrated through a single `docker-compose.yml` file found in the root of this respository.
 
-A bird's-eye view of the project's general data flow:
+A bird's-eye view of the project's data flow:
 ```
 frontend -> write-service -> events table -> events_read table -> read-service -> SSE -> frontend
 ```
@@ -535,10 +535,10 @@ This project is designed to showcase a simple event-driven microservice architec
         |   RDS Postgres  |
         ------------------- 
 ```
-4. CI/CD (GitHub Actions)
-5. Infrastructure as Code (Terraform or CloudFormation if in AWS)
-6. More complex orchestrators (i.e. Kubernetes)
-7. Support flags for the helper script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
-8. Multi-calendar support (i.e. every month for 2026)
-9. Monitoring & Observability (Prometheus & Grafana)
+4. Multi-calendar support for every month in 2026
+5. CI/CD (GitHub Actions)
+6. Infrastructure as Code (Terraform or CloudFormation if in AWS)
+7. Monitoring & Observability (Prometheus & Grafana)
+8. More complex orchestrators (Kubernetes)
+9. Support flags for the helper script (i.e. `--verbose` to print all Docker output, `--no-prune` to keep old images, `--skip-build` to skip the docker compose build step, etc.)
 10. More robust test suite: end-to-end, performance benchmarking, load testing, unit testing, cross-browser, etc.
