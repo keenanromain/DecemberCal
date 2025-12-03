@@ -119,7 +119,7 @@ curl -X PUT http://localhost:4000/events/$EVENT_ID \
    
 20. Files of interest:
 
-## Utility & Support Files
+### Utility & Support Files
 
    - `docker-compose.yml`
        - Orchestrates all four services (Postgres, read-service, write-service, frontend) into a unified local environment.
@@ -133,7 +133,7 @@ curl -X PUT http://localhost:4000/events/$EVENT_ID \
    - `tests/run_all_tests.sh`
         - End-to-end validation of write-service, read-service correctness, and method blocking.
 
-## Frontend
+### Frontend
 
    - `frontend/Dockerfile`
         - Multi-stage build: compiles the React app using Vite, then creates a minimal, production-grade NGINX image.
@@ -163,7 +163,7 @@ curl -X PUT http://localhost:4000/events/$EVENT_ID \
         - Makes containerized development easier by exposing the Vite dev server to Docker networking.
         - Enables React fast-refresh and dev server configuration (port 5173, host 0.0.0.0).
 
-## Write-Service (TypeScript)
+### Write-Service (TypeScript)
 
    - `services/write-service-ts/Dockerfile`
         - Multi-stage build that compiles TS → JS in a Node 20 Slim image, then runs the result in a clean runtime environment.
@@ -189,7 +189,7 @@ curl -X PUT http://localhost:4000/events/$EVENT_ID \
         - Creates the events_read table.
         - Defines the PostgreSQL trigger sync_events_to_read() to perform pg_notify('events_changed', payload) for SSE.
 
-## Read-Service (Go)
+### Read-Service (Go)
 
    - `services/read-service-go/Dockerfile`
         - Multi-stage build producing a static Go binary.
