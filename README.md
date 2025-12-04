@@ -164,7 +164,6 @@ The database runs via Docker Compose:
 ```yaml
 postgres:
     image: postgres:15
-    platform: linux/arm64
     environment:
       POSTGRES_USER: decembercal
       POSTGRES_PASSWORD: decembercal

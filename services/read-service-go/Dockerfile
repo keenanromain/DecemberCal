@@ -8,7 +8,7 @@ RUN go mod download
 
 COPY . .
 
-RUN GOOS=linux GOARCH=arm64 go build -o readsvc ./cmd/readsvc
+RUN go build -o readsvc ./cmd/readsvc
 
 # Runtime
 FROM gcr.io/distroless/base-debian12
